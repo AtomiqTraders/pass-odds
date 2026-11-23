@@ -79,3 +79,13 @@ The engine (`js/sim.js`) and sizer (`js/sizer.js`) are plain modules with no DOM
 ## License
 
 MIT
+
+## Security
+
+- Static site, no backend, no accounts, no keys. Nothing you type leaves your browser except price requests to Binance and Hyperliquid.
+- Strict Content Security Policy: scripts only from this site; network calls only to this site, Binance and Hyperliquid.
+- Every value inserted into the page is HTML-escaped. Market data from the firm's API is validated (plain symbols, positive numbers) before it is committed.
+- Share-link values are clamped to the form's limits, so a crafted link can't freeze the page.
+- GitHub Actions are pinned to commit SHAs, and the workflow token is read-only except for the one job that commits the market list.
+
+Found a problem? Open an issue.

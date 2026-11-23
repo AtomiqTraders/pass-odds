@@ -68,10 +68,11 @@ export function normalize(opts) {
   if (!(o.riskPct > 0 && o.riskPct < 1)) throw new Error("Risk per trade must be between 0% and 100%.");
   if (!(o.tradesPerDay >= 1)) throw new Error("Trade at least once a day.");
   if (!(o.days >= 1)) throw new Error("Simulate at least one day.");
-  o.tradesPerDay = Math.floor(o.tradesPerDay);
-  o.days = Math.floor(o.days);
-  o.runs = Math.max(1, Math.floor(o.runs));
-  o.maxLossesPerDay = Math.max(0, Math.floor(o.maxLossesPerDay || 0));
+  // Hard caps keep a crafted share link from freezing someone's browser.
+  o.tradesPerDay = Math.min(50, Math.floor(o.tradesPerDay));
+  o.days = Math.min(365, Math.floor(o.days));
+  o.runs = Math.min(20000, Math.max(1, Math.floor(o.runs)));
+  o.maxLossesPerDay = Math.min(50, Math.max(0, Math.floor(o.maxLossesPerDay || 0)));
   return o;
 }
 

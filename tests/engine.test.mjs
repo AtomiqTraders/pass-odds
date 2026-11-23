@@ -102,6 +102,13 @@ test("recommend: fixed $ risk prefers bigger accounts and skips impossible ones"
   assert.throws(() => recommend({ unit: "usd", riskUsd: 9000, sizes: [10000], winRate: 0.5, avgWinR: 2, avgLossR: 1, costR: 0, tradesPerDay: 1, days: 30 }), /too big/);
 });
 
+test("caps stop a crafted link from freezing the page", () => {
+  const r = simulate({ plan: select, tradesPerDay: 1e7, days: 1e7, runs: 1e9, maxLossesPerDay: 1e9, winRate: 0.5, riskPct: 0.001 });
+  assert.equal(r.options.tradesPerDay, 50);
+  assert.equal(r.options.days, 365);
+  assert.equal(r.options.runs, 20000);
+});
+
 test("input validation", () => {
   assert.throws(() => simulate({ plan: select, winRate: 1.5 }), /Win rate/);
   assert.throws(() => simulate({}), /plan/);

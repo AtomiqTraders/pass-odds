@@ -7,6 +7,8 @@ const $ = (id) => document.getElementById(id);
 const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
 const money = (x, d = 0) => "$" + Number(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const num = (x, d = 2) => Number(x).toLocaleString("en-US", { maximumFractionDigits: d });
+/** Escape text before it goes into innerHTML. Every non-constant value passes through this. */
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -23,8 +25,17 @@ $("theme").addEventListener("click", () => {
   const next = dark ? "light" : "dark";
   document.documentElement.dataset.theme = next;
   store.set("theme", next);
+  themeLabel();
   if (lastResult) { drawPaths(lastResult); }
 });
+
+function themeLabel() {
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  $("theme").textContent = dark ? "Day edition" : "Night edition";
+}
+themeLabel();
 
 /* ---------- tabs ---------- */
 const tabs = [["tab-odds", "view-odds"], ["tab-size", "view-size"]];
@@ -74,7 +85,10 @@ function loadFromHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   for (const [k, id] of Object.entries(FIELDS)) {
     const v = q.get(k);
-    if (v != null && v !== "" && Number.isFinite(Number(v))) $(id).value = v;
+    if (v == null || v === "" || !Number.isFinite(Number(v))) continue;
+    const el = $(id);
+    const lo = el.min === "" ? -Infinity : Number(el.min), hi = el.max === "" ? Infinity : Number(el.max);
+    el.value = String(Math.min(hi, Math.max(lo, Number(v))));
   }
   if (q.get("u") === "usd") document.querySelector("input[name=unit][value=usd]").checked = true;
   if (q.get("sz")) {
@@ -192,6 +206,12 @@ function compute(input) {
   return new Promise((resolve) => { pending.set(id, resolve); worker.postMessage({ id, input }); });
 }
 
+// Canvas text only uses web fonts once they're loaded, so wait for the faces the card uses.
+const cardFonts = Promise.all(
+  ['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 20px "IBM Plex Sans"', '600 20px "IBM Plex Sans"', '500 20px "IBM Plex Mono"']
+    .map((f) => document.fonts.load(f).catch(() => null)),
+).catch(() => null);
+
 let latest = 0;
 let lastRec = null;
 async function runOdds(animate = false) {
@@ -219,14 +239,14 @@ async function runOdds(animate = false) {
   else { cancelAnimationFrame(tween.paths); drawPaths(res, 1); }
   renderTips(tips, res.options);
   renderRanking(rec, view);
-  drawCard($("card-preview"), res, { siteUrl: siteUrl(), isBest: view.isBest, sizeMatters: rec.sizeMatters });
+  cardFonts.then(() => drawCard($("card-preview"), res, { siteUrl: siteUrl(), isBest: view.isBest, sizeMatters: rec.sizeMatters }));
 }
 
 const acctName = (rec, c) => (rec.sizeMatters ? `${c.plan.name} · ${sizeName(c.size)}` : c.plan.name);
 function renderPick(rec, view, res, animate) {
   const best = rec.ranked[0];
   const name = (c) => acctName(rec, c);
-  $("pick-k").textContent = view.isBest ? "Best account for how you trade" : "You're comparing";
+  $("pick-k").textContent = view.isBest ? "Our pick for how you trade" : "You're comparing";
   $("pick-name").textContent = name(view);
   $("pick").classList.toggle("is-best", view.isBest);
   const n = rec.ranked.length;
@@ -269,22 +289,20 @@ function renderHero(r) {
     (rd == null ? `${r.room.lossesToMaxDDBreach} losers in a row end the ${o.plan.name} challenge` : `${rd} losers in one day end the ${o.plan.name} challenge`);
   $("view-size").hidden = !(lastRec && lastRec.rec.sizeMatters);
   const parts = [
-    ["Passed", p.pass, "--pass"],
-    ["Daily loss breach", p.dll, "--dll"],
-    ["Max drawdown breach", p.maxdd, "--maxdd"],
-    [`Still going at day ${o.days}`, p.open, "--open"],
+    ["Passed", p.pass, "pass"],
+    ["Hit the daily loss limit", p.dll, "dll"],
+    ["Hit max drawdown", p.maxdd, "maxdd"],
+    [noLimit ? "Still going after a year" : `Still going at day ${o.days}`, p.open, "open"],
   ];
-  // Reuse the bar segments so width changes glide instead of jumping.
+  // The bar segments live in the HTML; only their widths change, so they glide.
   const bar = $("stackbar");
-  if (bar.children.length !== parts.length) {
-    bar.innerHTML = parts.map(([, , c]) => `<span style="width:0;background:var(${c})"></span>`).join("");
-    void bar.offsetWidth;
-  }
   parts.forEach(([, v], i) => { bar.children[i].style.width = `${v * 100}%`; });
   $("legend").innerHTML = parts
     .filter(([label, v]) => v > 0 || label === "Passed")
-    .map(([label, v, c]) => `<li><i style="background:var(${c})"></i>${label} <b>${pct(v, v > 0 && v < 0.01 ? 1 : 0)}</b></li>`)
+    .map(([label, v, k]) => `<li><i class="k-${k}"></i>${esc(label)}<b>${pct(v, v > 0 && v < 0.01 ? 1 : 0)}</b></li>`)
     .join("");
+  $("price").textContent = fairPrice(p.pass);
+  $("price").title = "The same odds written the way a bookmaker would.";
   $("verdict").textContent = verdict(r);
 
   const rm = r.room;
@@ -295,7 +313,7 @@ function renderHero(r) {
     ["Bad run that ends it", `${rm.lossesToMaxDDBreach} losers`, "in a row from the start hit the floor"],
     ["Clean run to pass", Number.isFinite(rm.winnersToTarget) ? `${rm.winnersToTarget} winners` : "never", "in a row reach the target"],
   ];
-  $("stats").innerHTML = s.map(([k, v, sub]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
+  $("stats").innerHTML = s.map(([k, v, sub]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd><div class="s">${esc(sub)}</div></div>`).join("");
 
   const warns = [];
   if (rm.singleLossBreachesDaily) warns.push("One full loss at this risk reaches the daily loss limit. A single bad trade ends the challenge.");
@@ -303,7 +321,21 @@ function renderHero(r) {
   if (o.avgWinR <= o.costR) warns.push("Your costs are as big as your average win, so winners add nothing.");
   if (p.open > 0.2) warns.push(`${pct(p.open)} of runs are still going after ${o.days} days. There's no time limit, so try more days.`);
   $("room-warn").hidden = !warns.length;
-  $("room-warn").innerHTML = warns.join("<br>");
+  $("room-warn").innerHTML = warns.map(esc).join("<br>");
+}
+
+const PRICES = ["1/100","1/50","1/33","1/25","1/20","1/16","1/12","1/10","1/8","1/6","1/5","2/9","1/4","2/7","1/3","2/5","4/9","1/2","4/7","4/6","4/5","10/11","evens","11/10","5/4","6/4","7/4","2/1","5/2","3/1","7/2","4/1","5/1","6/1","8/1","10/1","12/1","16/1","20/1","25/1","33/1","50/1","100/1"];
+function fairPrice(pass) {
+  if (pass >= 0.995) return "Fair price: a near certainty";
+  if (pass <= 0.005) return "Fair price: no chance";
+  const against = (1 - pass) / pass;
+  let best = PRICES[0], gap = Infinity;
+  for (const f of PRICES) {
+    const v = f === "evens" ? 1 : f.split("/").reduce((a, b) => a / b);
+    const g = Math.abs(Math.log(v) - Math.log(against));
+    if (g < gap) { gap = g; best = f; }
+  }
+  return `Fair price: ${best}${best === "evens" ? "" : against < 1 ? " on" : " against"}`;
 }
 
 function badDay(rm, o) {
@@ -362,7 +394,7 @@ function drawPaths(r, progress = 1) {
   const X = (d) => L + (Math.min(d, xMax) / xMax) * (W - L - R);
   const Y = (e) => T + (1 - (e - lo) / (hi - lo)) * (H - T - B);
 
-  ctx.font = `12px ui-sans-serif, system-ui, sans-serif`;
+  ctx.font = `12px "IBM Plex Mono", ui-monospace, monospace`;
   ctx.fillStyle = css("--muted");
   ctx.textBaseline = "middle";
   const line = (y, color, label, dash, labelColor = color) => {
@@ -421,11 +453,11 @@ function drawPaths(r, progress = 1) {
 function renderTips(rows, opts) {
   const sign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n);
   $("tips").innerHTML = rows.map(({ label, passPts, failPts, pass, fail, dayDelta }) => {
-    const passCls = passPts > 0 ? "delta-up" : passPts < 0 ? "delta-down" : "muted";
-    const failCls = failPts < 0 ? "delta-up" : failPts > 0 ? "delta-down" : "muted";
+    const passCls = passPts > 0 ? "up" : passPts < 0 ? "down" : "muted";
+    const failCls = failPts < 0 ? "up" : failPts > 0 ? "down" : "muted";
     const speed = dayDelta == null || Math.abs(dayDelta) < 2 ? ""
-      : ` · <span class="${dayDelta < 0 ? "delta-up" : "delta-down"}">${Math.abs(dayDelta)} days ${dayDelta < 0 ? "faster" : "slower"}</span>`;
-    return `<li><span>${label}</span><span class="small"><span class="${passCls}">pass ${pct(pass)} (${sign(passPts)})</span> · <span class="${failCls}">fail ${pct(fail)} (${sign(failPts)})</span>${speed}</span></li>`;
+      : ` · <span class="${dayDelta < 0 ? "up" : "down"}">${Math.abs(dayDelta)}d ${dayDelta < 0 ? "faster" : "slower"}</span>`;
+    return `<li><span class="what">${esc(label)}</span><span class="fx"><span class="${passCls}">pass ${pct(pass)} (${sign(passPts)})</span> · <span class="${failCls}">breach ${pct(fail)} (${sign(failPts)})</span>${speed}</span></li>`;
   }).join("");
   const slow = rows.some((r) => r.passPts < 0 && r.failPts < 0);
   $("tips-note").textContent = slow
@@ -440,12 +472,12 @@ function renderRanking(rec, view) {
     const isView = c.plan.id === view.plan.id && (!rec.sizeMatters || c.size === view.size);
     const cls = [i === 0 ? "best" : "", isView && !view.isBest ? "current" : ""].join(" ");
     const key = `${c.plan.id}|${c.size}`;
-    return `<tr class="${cls}" data-key="${key}" tabindex="0" title="Show this account"><td>${i + 1}</td><td>${label(c)}</td><td class="num">${pct(c.plan.target)}</td><td class="num">${c.plan.dll == null ? "none" : pct(c.plan.dll)}</td><td class="num">${pct(c.plan.maxDD)}</td><td class="num">${pct(p.pass)}</td><td class="num">${pct(p.fail)}</td><td class="num">${c.median ?? "–"}</td></tr>`;
+    return `<tr class="${cls}" data-key="${esc(key)}" tabindex="0" title="Show this account"><td>${String(i + 1).padStart(2, "0")}</td><td>${esc(label(c))}</td><td class="r">${pct(c.plan.target)}</td><td class="r">${c.plan.dll == null ? "none" : pct(c.plan.dll)}</td><td class="r">${pct(c.plan.maxDD)}</td><td class="r">${pct(p.pass)}</td><td class="r">${pct(p.fail)}</td><td class="r">${c.median ?? "–"}</td></tr>`;
   }).join("");
   const notes = [];
   notes.push(rec.sizeMatters
-    ? "You risk a fixed dollar amount, so bigger accounts give you more room. Click a row to see that account."
-    : "You risk a % of the account, so size doesn't change the odds. Click a row to see that plan.");
+    ? "You risk a fixed dollar amount, so a bigger account gives you more room."
+    : "You risk a % of the account, so size doesn't change the odds.");
   if (rec.skipped) notes.push(`Left out ${rec.skipped} account${rec.skipped > 1 ? "s" : ""} where your dollar risk is half the account or more.`);
   notes.push("Prices differ between plans and sizes; check them on the site.");
   $("plans-note").textContent = notes.join(" ");
@@ -527,7 +559,7 @@ requestAnimationFrame(() => setTimeout(() => runOdds(true), reduceMotion.matches
 const revealer = new IntersectionObserver((entries) => {
   for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); revealer.unobserve(e.target); }
 }, { rootMargin: "0px 0px -8% 0px" });
-document.querySelectorAll(".panel").forEach((el, i) => {
+document.querySelectorAll(".sheet").forEach((el, i) => {
   el.classList.add("reveal");
   el.style.setProperty("--d", `${Math.min(i, 4) * 70}ms`);
   revealer.observe(el);
@@ -637,26 +669,28 @@ function renderSize() {
   }
   const s = sizePosition({ equity, riskUsd: v("s-risk"), entry: v("s-entry"), stop: v("s-stop"), market: m, dailyRoomUsd: dailyRoom, ddRoomUsd: ddRoom });
   if (!s.ok) {
-    out.innerHTML = `<div class="err">${s.errors.join("<br>")}</div>${roomHtml(plan, dailyRoom, ddRoom)}`;
+    out.innerHTML = `<div class="err">${s.errors.map(esc).join("<br>")}</div>${roomHtml(plan, dailyRoom, ddRoom)}`;
     return;
   }
-  const dec = m.size_decimals ?? 4;
+  const dec = Number.isInteger(m.size_decimals) ? Math.min(12, Math.max(0, m.size_decimals)) : 4;
+  const sym = esc(m.symbol);
+  const item = (k, val, sub) => `<div><dt>${esc(k)}</dt><dd>${esc(val)}</dd><div class="s">${esc(sub)}</div></div>`;
   out.innerHTML = `
-    <div class="muted small">${s.side === "long" ? "Long" : "Short"} ${m.symbol}</div>
-    <div class="bigline">${s.qty.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec })} <span class="unit">${m.symbol}</span></div>
-    <div class="stats">
-      <div class="stat"><div class="k">Loss at stop</div><div class="v">${money(s.lossAtStop, 2)}</div><div class="s">limited by ${s.limitedBy}</div></div>
-      <div class="stat"><div class="k">Position value</div><div class="v">${money(s.notional)}</div><div class="s">${num(s.leverage)}x of ${s.maxLeverage}x max</div></div>
-      <div class="stat"><div class="k">Stop distance</div><div class="v">${pct(s.stopPct, 2)}</div><div class="s">${num(s.stopDist, 6)} per ${m.symbol}</div></div>
-      <div class="stat"><div class="k">Losses like this until the daily limit</div><div class="v">${s.lossesUntilDaily ?? "no limit"}</div><div class="s">${plan.name}</div></div>
-    </div>
-    ${s.warnings.map((w) => `<div class="warn">${w}</div>`).join("")}
+    <div class="side">${s.side === "long" ? "Long" : "Short"} ${sym}</div>
+    <div class="bigline">${esc(s.qty.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec }))}<span class="unit">${sym}</span></div>
+    <dl class="stats">
+      ${item("Loss at stop", money(s.lossAtStop, 2), `limited by ${s.limitedBy}`)}
+      ${item("Position value", money(s.notional), `${num(s.leverage)}x of ${s.maxLeverage}x max`)}
+      ${item("Stop distance", pct(s.stopPct, 2), `${num(s.stopDist, 6)} per ${m.symbol}`)}
+      ${item("Losses like this to the daily limit", s.lossesUntilDaily ?? "no limit", plan.name)}
+    </dl>
+    ${s.warnings.map((w) => `<div class="warn">${esc(w)}</div>`).join("")}
     ${roomHtml(plan, dailyRoom, ddRoom)}
-    <p class="small muted">Copy the size into the order ticket yourself. This tool never places orders.</p>`;
+    <p class="small muted">Type the size into the order ticket yourself. This tool never places orders.</p>`;
 }
 
 function roomHtml(plan, dailyRoom, ddRoom) {
-  return `<h3>Room left today</h3><p class="small">Daily loss limit: <b>${Number.isFinite(dailyRoom) ? money(dailyRoom) : "none on this plan"}</b> · Above the drawdown floor: <b>${money(ddRoom)}</b></p>`;
+  return `<h3>Room left today</h3><p class="small">Daily loss limit: <b>${esc(Number.isFinite(dailyRoom) ? money(dailyRoom) : "none on this plan")}</b> · Above the drawdown floor: <b>${esc(money(ddRoom))}</b> · ${esc(plan.name)}</p>`;
 }
 
 $("market").addEventListener("change", onMarket);
