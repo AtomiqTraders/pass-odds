@@ -2,7 +2,8 @@
 // can run in a Web Worker (keeps sliders smooth) or directly as a fallback.
 import { PLANS, simulate, recommend } from "./sim.js?v=6";
 
-const RANK_RUNS = 2000;
+const RANK_RUNS = 10000;
+const RANK_RUNS_USD = 3000;
 const MAIN_RUNS = 10000;
 const TIP_RUNS = 3000;
 
@@ -15,7 +16,8 @@ const num = (x) => Number(x).toLocaleString("en-US", { maximumFractionDigits: 2 
  * @param {string|number} viewSize "auto" or a size to compare
  */
 export function analyze({ strategy, viewPlan = "auto", viewSize = "auto" }) {
-  const rec = recommend(strategy, { runs: RANK_RUNS });
+  // % risk: 4 plans x 10,000 runs each. Fixed $: 16 accounts, so fewer runs each to stay quick.
+  const rec = recommend(strategy, { runs: strategy.unit === "usd" ? RANK_RUNS_USD : RANK_RUNS });
   const view = pickView(rec, strategy, viewPlan, viewSize);
   const result = simulate({ ...view.opts, runs: MAIN_RUNS, keepPaths: 50 });
   const tips = tipRows(view.opts, result, strategy.unit);
