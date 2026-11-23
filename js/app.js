@@ -1,7 +1,7 @@
-import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js?v=5";
-import { sizePosition, atr } from "./sizer.js?v=5";
-import { fetchPrice, fetchCandles, priceSupported } from "./market.js?v=5";
-import { drawCard } from "./card.js?v=5";
+import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js?v=6";
+import { sizePosition, atr } from "./sizer.js?v=6";
+import { fetchPrice, fetchCandles, priceSupported } from "./market.js?v=6";
+import { drawCard } from "./card.js?v=6";
 
 const $ = (id) => document.getElementById(id);
 const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
@@ -184,7 +184,7 @@ function animatePass(to) {
 /* ---------- compute in a worker so sliders stay smooth ---------- */
 let worker = null;
 try {
-  worker = new Worker(new URL("./worker.js?v=5", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=6", import.meta.url), { type: "module" });
 } catch { worker = null; }
 let reqId = 0;
 const pending = new Map();
@@ -198,7 +198,7 @@ if (worker) {
 }
 function compute(input) {
   if (!worker) {
-    return import("./engine.js?v=5").then(({ analyze }) => {
+    return import("./engine.js?v=6").then(({ analyze }) => {
       try { return { out: analyze(input) }; } catch (err) { return { error: err.message }; }
     });
   }
@@ -208,7 +208,7 @@ function compute(input) {
 
 // Canvas text only uses web fonts once they're loaded, so wait for the faces the card uses.
 const cardFonts = Promise.all(
-  ['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 20px "IBM Plex Sans"', '600 20px "IBM Plex Sans"']
+  ['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 20px "Instrument Sans"', '600 20px "Instrument Sans"']
     .map((f) => document.fonts.load(f).catch(() => null)),
 ).catch(() => null);
 
@@ -234,6 +234,7 @@ async function runOdds(animate = false) {
   lastResult = res;
   lastRec = { rec, view };
   renderPick(rec, view, res, animate);
+  renderTicker(rec);
   renderHero(res);
   if (animate) tween(1400, (k) => drawPaths(res, k), "paths");
   else { cancelAnimationFrame(tween.paths); drawPaths(res, 1); }
@@ -242,11 +243,34 @@ async function runOdds(animate = false) {
   cardFonts.then(() => drawCard($("card-preview"), res, { siteUrl: siteUrl(), isBest: view.isBest, sizeMatters: rec.sizeMatters }));
 }
 
+/** Hero ticker: one card per account with its pass chance and one real sample run. */
+let tickerKey = "";
+function renderTicker(rec) {
+  const cards = rec.ranked.map((c, i) => {
+    const tone = c.pass >= 0.6 ? "good" : c.pass >= 0.35 ? "mid" : "bad";
+    let spark = "";
+    if (c.sample && c.sample.equity.length > 1) {
+      const e = c.sample.equity, lo = Math.min(...e), hi = Math.max(...e), span = hi - lo || 1;
+      const pts = e.map((v, j) => `${((j / (e.length - 1)) * 200).toFixed(1)},${(30 - ((v - lo) / span) * 28).toFixed(1)}`).join(" ");
+      const cls = c.sample.outcome === "pass" ? "up" : c.sample.outcome === "open" ? "flat" : "down";
+      spark = `<svg viewBox="0 0 200 32" preserveAspectRatio="none" aria-hidden="true"><polyline class="${cls}" points="${pts}"/></svg>`;
+    }
+    const size = rec.sizeMatters ? sizeName(c.size) + " account" : "any size";
+    return `<div class="tcard${i === 0 ? " best" : ""}"><span class="tname">${esc(c.plan.name)}</span><span class="tpass ${tone}">${pct(c.pass)}</span><span class="tsize">${esc(size)}${i === 0 ? " · best fit" : ""}</span>${spark}</div>`;
+  });
+  // Repeat the set so the strip loops seamlessly (the track scrolls by half its width).
+  const reps = Math.max(2, Math.ceil(8 / cards.length) * 2);
+  const html = Array.from({ length: reps }, () => cards.join("")).join("");
+  if (html === tickerKey) return;
+  tickerKey = html;
+  $("ticker").innerHTML = html;
+}
+
 const acctName = (rec, c) => (rec.sizeMatters ? `${c.plan.name} · ${sizeName(c.size)}` : c.plan.name);
 function renderPick(rec, view, res, animate) {
   const best = rec.ranked[0];
   const name = (c) => acctName(rec, c);
-  $("pick-k").textContent = view.isBest ? "Our pick for how you trade" : "You're comparing";
+  $("pick-k").textContent = view.isBest ? "Your best fit" : "You're comparing";
   $("pick-name").textContent = name(view);
   $("pick").classList.toggle("is-best", view.isBest);
   const n = rec.ranked.length;
@@ -395,7 +419,7 @@ function drawPaths(r, progress = 1) {
   const X = (d) => L + (Math.min(d, xMax) / xMax) * (W - L - R);
   const Y = (e) => T + (1 - (e - lo) / (hi - lo)) * (H - T - B);
 
-  ctx.font = `12px "IBM Plex Sans", Arial, sans-serif`;
+  ctx.font = `12px "Instrument Sans", Arial, sans-serif`;
   ctx.fillStyle = css("--muted");
   ctx.textBaseline = "middle";
   const line = (y, color, label, dash, labelColor = color) => {

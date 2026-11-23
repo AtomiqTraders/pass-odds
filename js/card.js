@@ -2,20 +2,20 @@
 // form-guide slip: paper, ink, rules. Fixed palette so it reads the same anywhere.
 
 const C = {
-  paper: "#f2eee3", paper2: "#e8e3d4", ink: "#191814", ink2: "#3b392f", muted: "#6d6858", rule: "#cdc6b2",
-  pass: "#1d5e3a", dll: "#a8641a", maxdd: "#9c2b1d", open: "#9a9483",
+  paper: "#0e0f0c", paper2: "#191a16", ink: "#f3f4ee", ink2: "#cfd1c8", muted: "#9a9d92", rule: "#2b2d27",
+  pass: "#c6f432", dll: "#f5b54a", maxdd: "#ff7a5c", open: "#4a4c45", lime: "#c6f432", limeInk: "#0e0f0c",
 };
 const SERIF = '"Instrument Serif", Georgia, "Times New Roman", serif';
-const SANS = '"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif';
+const SANS = '"Instrument Sans", "Helvetica Neue", Arial, sans-serif';
 
 const pct = (x) => `${Math.round(x * 100)}%`;
 
 /** The Pass Odds mark: an ink square with "P/O" set like a bookmaker's price. */
-export function drawLogo(ctx, x, y, s, { ink = C.ink, paper = C.paper } = {}) {
+export function drawLogo(ctx, x, y, s) {
   ctx.save();
-  ctx.fillStyle = ink;
-  ctx.fillRect(x, y, s, s);
-  ctx.fillStyle = paper;
+  ctx.fillStyle = C.lime;
+  ctx.beginPath(); ctx.roundRect(x, y, s, s, s * 0.25); ctx.fill();
+  ctx.fillStyle = C.limeInk;
   ctx.font = `italic ${Math.round(s * 0.47)}px ${SERIF}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -39,31 +39,32 @@ export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMat
   ctx.fillRect(0, 0, W, H);
 
   // masthead: heavy rule, brand, edition line, thin rule
-  rule(ctx, L, R, 44, 4);
+  
   drawLogo(ctx, L, 60, 42);
   ctx.fillStyle = C.ink;
   ctx.textBaseline = "middle";
-  ctx.font = `400 34px ${SERIF}`;
+  ctx.font = `600 28px ${SANS}`;
   ctx.fillText("Pass Odds", L + 56, 82);
   ctx.textAlign = "right";
   ctx.fillStyle = C.muted;
   ctx.font = `600 15px ${SANS}`;
-  ctx.fillText("A FORM GUIDE FOR MYFUNDEDPERPS CHALLENGES", R, 82);
+  ctx.fillText("FIND THE CHALLENGE BUILT FOR YOU", R, 82);
   ctx.textAlign = "left";
-  rule(ctx, L, R, 116, 1);
+  rule(ctx, L, R, 116, 1, C.rule);
 
   // the pick
   const acct = sizeMatters ? `${o.plan.name}, $${o.startBalance / 1000}K` : o.plan.name;
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = C.muted;
   ctx.font = `600 15px ${SANS}`;
-  ctx.fillText(isBest ? "OUR PICK FOR MY STRATEGY" : "THE ACCOUNT I CHECKED", L, 160);
+  ctx.fillStyle = isBest ? C.lime : C.muted;
+  ctx.fillText(isBest ? "MY BEST FIT" : "THE ACCOUNT I CHECKED", L, 160);
   ctx.fillStyle = C.ink;
   ctx.font = `${isBest ? "" : "italic "}400 72px ${SERIF}`;
   ctx.fillText(acct, L, 228);
 
   // the odds
-  const tone = p.pass >= 0.6 ? C.pass : p.pass >= 0.35 ? C.dll : C.maxdd;
+  const tone = p.pass >= 0.6 ? C.lime : p.pass >= 0.35 ? C.dll : C.maxdd;
   ctx.fillStyle = tone;
   ctx.font = `400 190px ${SERIF}`;
   ctx.fillText(pct(p.pass), L - 6, 420);
@@ -110,7 +111,7 @@ export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMat
   }
 
   // the form: stats row between rules
-  rule(ctx, L, R, 500, 1);
+  rule(ctx, L, R, 500, 1, C.rule);
   const cells = [
     ["WIN RATE", pct(o.winRate)],
     ["AVG WIN / LOSS", `${trim(o.avgWinR)}R / ${trim(o.avgLossR)}R`],
@@ -135,11 +136,11 @@ export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMat
   ctx.font = `400 15px ${SANS}`;
   ctx.fillText("Simulated, not real results. Discipline decides who passes. Unofficial; not affiliated with MyFundedPerps.", L, 620);
   if (siteUrl) {
-    ctx.fillStyle = C.ink;
+    ctx.fillStyle = C.lime;
     ctx.font = `600 17px ${SANS}`;
     ctx.fillText(siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""), L, 648);
   }
-  rule(ctx, L, R, 663, 4);
+  
 }
 
 function trim(n) {

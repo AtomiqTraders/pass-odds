@@ -198,7 +198,7 @@ export function recommend(strategy, { plans = PLANS, sizes = SIZES, runs = 4000 
   // Rank by pass chance in whole points (finer gaps are simulation noise),
   // then fewer breaches, then a faster typical pass.
   const ranked = candidates
-    .map((c) => ({ ...c, result: simulate({ ...c.opts, runs, keepPaths: 0 }) }))
+    .map((c) => ({ ...c, result: simulate({ ...c.opts, runs, keepPaths: 1 }) }))
     .sort((a, b) => {
       const pa = a.result.probability, pb = b.result.probability;
       return (Math.round(pb.pass * 100) - Math.round(pa.pass * 100))

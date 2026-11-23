@@ -1,6 +1,6 @@
 // Everything the "Find my account" view needs, computed in one pure call so it
 // can run in a Web Worker (keeps sliders smooth) or directly as a fallback.
-import { PLANS, simulate, recommend } from "./sim.js?v=5";
+import { PLANS, simulate, recommend } from "./sim.js?v=6";
 
 const RANK_RUNS = 2000;
 const MAIN_RUNS = 10000;
@@ -29,12 +29,23 @@ export function analyze({ strategy, viewPlan = "auto", viewSize = "auto" }) {
         pass: c.result.probability.pass,
         fail: c.result.probability.fail,
         median: c.result.passDays.median,
+        sample: thin(c.result.paths[0]),
       })),
     },
     view: { plan: view.plan, size: view.size, isBest: view.isBest },
     result,
     tips,
   };
+}
+
+/** One sample run, thinned to at most 40 points, for the ticker sparklines. */
+function thin(path) {
+  if (!path) return null;
+  const e = path.equity;
+  const step = Math.max(1, Math.ceil(e.length / 40));
+  const pts = e.filter((_, i) => i % step === 0);
+  if (pts[pts.length - 1] !== e[e.length - 1]) pts.push(e[e.length - 1]);
+  return { outcome: path.outcome, equity: pts };
 }
 
 function pickView(rec, strategy, vp, vs) {
