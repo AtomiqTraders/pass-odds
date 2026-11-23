@@ -7,7 +7,6 @@ const C = {
 };
 const SERIF = '"Instrument Serif", Georgia, "Times New Roman", serif';
 const SANS = '"IBM Plex Sans", "Helvetica Neue", Arial, sans-serif';
-const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
 
 const pct = (x) => `${Math.round(x * 100)}%`;
 
@@ -99,7 +98,7 @@ export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMat
     ctx.font = `400 21px ${SANS}`;
     ctx.fillText(label, x0 + 22, y);
     const lw = ctx.measureText(label).width;
-    ctx.font = `500 21px ${MONO}`;
+    ctx.font = `600 21px ${SANS}`;
     const val = pct(v);
     const vw = ctx.measureText(val).width;
     ctx.textAlign = "right";
@@ -126,7 +125,7 @@ export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMat
     ctx.font = `600 13px ${SANS}`;
     ctx.fillText(k, cx, 530);
     ctx.fillStyle = C.ink;
-    ctx.font = `500 28px ${MONO}`;
+    ctx.font = `400 36px ${SERIF}`;
     ctx.fillText(v, cx, 568);
   });
   rule(ctx, L, R, 590, 1, C.rule);
@@ -137,7 +136,7 @@ export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMat
   ctx.fillText("Simulated, not real results. Discipline decides who passes. Unofficial; not affiliated with MyFundedPerps.", L, 620);
   if (siteUrl) {
     ctx.fillStyle = C.ink;
-    ctx.font = `500 17px ${MONO}`;
+    ctx.font = `600 17px ${SANS}`;
     ctx.fillText(siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""), L, 648);
   }
   rule(ctx, L, R, 663, 4);

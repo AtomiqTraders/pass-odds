@@ -208,7 +208,7 @@ function compute(input) {
 
 // Canvas text only uses web fonts once they're loaded, so wait for the faces the card uses.
 const cardFonts = Promise.all(
-  ['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 20px "IBM Plex Sans"', '600 20px "IBM Plex Sans"', '500 20px "IBM Plex Mono"']
+  ['400 40px "Instrument Serif"', 'italic 400 40px "Instrument Serif"', '400 20px "IBM Plex Sans"', '600 20px "IBM Plex Sans"']
     .map((f) => document.fonts.load(f).catch(() => null)),
 ).catch(() => null);
 
@@ -394,7 +394,7 @@ function drawPaths(r, progress = 1) {
   const X = (d) => L + (Math.min(d, xMax) / xMax) * (W - L - R);
   const Y = (e) => T + (1 - (e - lo) / (hi - lo)) * (H - T - B);
 
-  ctx.font = `12px "IBM Plex Mono", ui-monospace, monospace`;
+  ctx.font = `12px "IBM Plex Sans", Arial, sans-serif`;
   ctx.fillStyle = css("--muted");
   ctx.textBaseline = "middle";
   const line = (y, color, label, dash, labelColor = color) => {
@@ -472,7 +472,7 @@ function renderRanking(rec, view) {
     const isView = c.plan.id === view.plan.id && (!rec.sizeMatters || c.size === view.size);
     const cls = [i === 0 ? "best" : "", isView && !view.isBest ? "current" : ""].join(" ");
     const key = `${c.plan.id}|${c.size}`;
-    return `<tr class="${cls}" data-key="${esc(key)}" tabindex="0" title="Show this account"><td>${String(i + 1).padStart(2, "0")}</td><td>${esc(label(c))}</td><td class="r">${pct(c.plan.target)}</td><td class="r">${c.plan.dll == null ? "none" : pct(c.plan.dll)}</td><td class="r">${pct(c.plan.maxDD)}</td><td class="r">${pct(p.pass)}</td><td class="r">${pct(p.fail)}</td><td class="r">${c.median ?? "–"}</td></tr>`;
+    return `<tr class="${cls}" data-key="${esc(key)}" tabindex="0" title="Show this account"><td>${i + 1}</td><td>${esc(label(c))}</td><td class="r">${pct(c.plan.target)}</td><td class="r">${c.plan.dll == null ? "none" : pct(c.plan.dll)}</td><td class="r">${pct(c.plan.maxDD)}</td><td class="r">${pct(p.pass)}</td><td class="r">${pct(p.fail)}</td><td class="r">${c.median ?? "–"}</td></tr>`;
   }).join("");
   const notes = [];
   notes.push(rec.sizeMatters
