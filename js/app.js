@@ -1,4 +1,4 @@
-import { PLANS, RULES_SOURCE, RULES_AS_OF, simulate, rankPlans } from "./sim.js";
+import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js";
 import { sizePosition, atr } from "./sizer.js";
 import { fetchPrice, fetchCandles, priceSupported } from "./market.js";
 import { drawCard } from "./card.js";
@@ -42,13 +42,15 @@ for (const [t] of tabs) $(t).addEventListener("click", () => showTab(t));
 $("rules-link").href = RULES_SOURCE;
 $("rules-date").textContent = RULES_AS_OF;
 
-/* ---------- plan selects ---------- */
-for (const sel of [$("plan"), $("s-plan")]) {
-  for (const p of PLANS) sel.add(new Option(p.name, p.id));
+/* ---------- plan + size selects ---------- */
+for (const p of PLANS) {
+  $("s-plan").add(new Option(p.name, p.id));
+  $("view-plan").add(new Option(p.name, p.id));
 }
+for (const s of SIZES) $("view-size").add(new Option(sizeName(s), String(s)));
 const planById = (id) => PLANS.find((p) => p.id === id) || PLANS[0];
-function planHint(p) {
-  const b = Number($("balance").value) || 0;
+function sizeName(s) { return s >= 1000 ? `$${s / 1000}K` : money(s); }
+function ruleLine(p, b) {
   const amt = (x) => (b ? ` (${money(x * b)})` : "");
   return `Make ${pct(p.target)}${amt(p.target)} to pass. ` +
     (p.dll == null ? "No daily loss limit. " : `Lose ${pct(p.dll)}${amt(p.dll)} in a day and you're out. `) +
@@ -57,44 +59,62 @@ function planHint(p) {
 
 /* ---------- odds form <-> URL ---------- */
 const FIELDS = {
-  plan: "plan", bal: "balance", wr: "winRate", rk: "riskPct", aw: "avgWinR",
-  al: "avgLossR", tpd: "tradesPerDay", stop: "maxLossesPerDay", c: "costR", d: "days",
+  wr: "winRate", rk: "riskPct", ru: "riskUsd", aw: "avgWinR", al: "avgLossR",
+  tpd: "tradesPerDay", stop: "maxLossesPerDay", c: "costR", d: "days",
 };
 const PRESETS = {
   scalper: { winRate: 55, avgWinR: 1.2, avgLossR: 1, riskPct: 0.25, tradesPerDay: 8, maxLossesPerDay: 0, costR: 0.1 },
   swing:   { winRate: 40, avgWinR: 3, avgLossR: 1, riskPct: 0.75, tradesPerDay: 1, maxLossesPerDay: 0, costR: 0.03 },
   yolo:    { winRate: 45, avgWinR: 2, avgLossR: 1, riskPct: 2, tradesPerDay: 4, maxLossesPerDay: 0, costR: 0.05 },
 };
+const unit = () => document.querySelector("input[name=unit]:checked").value;
+const sizeBoxes = () => [...document.querySelectorAll("#sizes input")];
 
 function loadFromHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   for (const [k, id] of Object.entries(FIELDS)) {
     const v = q.get(k);
-    if (v == null) continue;
-    if (id === "plan") { if (PLANS.some((p) => p.id === v)) $(id).value = v; }
-    else if (v !== "" && Number.isFinite(Number(v))) $(id).value = v;
+    if (v != null && v !== "" && Number.isFinite(Number(v))) $(id).value = v;
   }
+  if (q.get("u") === "usd") document.querySelector("input[name=unit][value=usd]").checked = true;
+  if (q.get("sz")) {
+    const want = q.get("sz").split(",");
+    for (const b of sizeBoxes()) b.checked = want.includes(b.value);
+  }
+  if (PLANS.some((p) => p.id === q.get("vp"))) $("view-plan").value = q.get("vp");
+  if (SIZES.map(String).includes(q.get("vs"))) $("view-size").value = q.get("vs");
+  applyUnit();
 }
 function writeHash() {
   const q = new URLSearchParams();
   for (const [k, id] of Object.entries(FIELDS)) q.set(k, $(id).value);
+  q.set("u", unit());
+  q.set("sz", sizeBoxes().filter((b) => b.checked).map((b) => b.value).join(","));
+  if ($("view-plan").value !== "auto") q.set("vp", $("view-plan").value);
+  if ($("view-size").value !== "auto") q.set("vs", $("view-size").value);
   history.replaceState(null, "", "#" + q.toString());
 }
+function applyUnit() {
+  const usd = unit() === "usd";
+  $("risk-pct-field").hidden = usd;
+  $("risk-usd-field").hidden = !usd;
+}
 
-function readOdds() {
+/** The strategy: everything about how you trade, nothing about which account. */
+function readStrategy() {
   const v = (id) => Number($(id).value);
   return {
-    plan: planById($("plan").value),
-    startBalance: v("balance"),
-    winRate: v("winRate") / 100,
+    unit: unit(),
     riskPct: v("riskPct") / 100,
+    riskUsd: v("riskUsd"),
+    sizes: sizeBoxes().filter((b) => b.checked).map((b) => Number(b.value)),
+    winRate: v("winRate") / 100,
     avgWinR: v("avgWinR"),
     avgLossR: v("avgLossR"),
     tradesPerDay: v("tradesPerDay"),
     maxLossesPerDay: v("maxLossesPerDay"),
     costR: v("costR"),
     days: v("days"),
-    runs: 10000,
     seed: 20261124,
   };
 }
@@ -147,41 +167,107 @@ function animatePass(to) {
   }
 }
 
-function runOdds(animate = false) {
-  document.body.classList.toggle("replay", animate);
+/* ---------- compute in a worker so sliders stay smooth ---------- */
+let worker = null;
+try {
+  worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+} catch { worker = null; }
+let reqId = 0;
+const pending = new Map();
+if (worker) {
+  worker.onmessage = (e) => {
+    const cb = pending.get(e.data.id);
+    pending.delete(e.data.id);
+    if (cb) cb(e.data);
+  };
+  worker.onerror = () => { worker = null; };
+}
+function compute(input) {
+  if (!worker) {
+    return import("./engine.js").then(({ analyze }) => {
+      try { return { out: analyze(input) }; } catch (err) { return { error: err.message }; }
+    });
+  }
+  const id = ++reqId;
+  return new Promise((resolve) => { pending.set(id, resolve); worker.postMessage({ id, input }); });
+}
+
+let latest = 0;
+let lastRec = null;
+async function runOdds(animate = false) {
   writeHash();
   syncSliders();
-  const opts = readOdds();
-  $("plan-hint").textContent = planHint(opts.plan);
-  let res;
-  try {
-    res = simulate({ ...opts, keepPaths: 50 });
-  } catch (e) {
-    $("odds-error").textContent = e.message;
+  applyUnit();
+  const ticket = ++latest;
+  $("results").classList.add("busy");
+  const msg = await compute({ strategy: readStrategy(), viewPlan: $("view-plan").value, viewSize: $("view-size").value });
+  if (ticket !== latest) return; // a newer change is on its way
+  $("results").classList.remove("busy");
+  if (msg.error) {
+    $("odds-error").textContent = msg.error;
     $("odds-error").hidden = false;
     return;
   }
   $("odds-error").hidden = true;
+  const { rec, view, result: res, tips } = msg.out;
+  document.body.classList.toggle("replay", animate);
   lastResult = res;
+  lastRec = { rec, view };
+  renderPick(rec, view, res, animate);
   renderHero(res);
   if (animate) tween(1400, (k) => drawPaths(res, k), "paths");
   else { cancelAnimationFrame(tween.paths); drawPaths(res, 1); }
-  renderTips(opts, res);
-  renderPlans(opts);
-  drawCard($("card-preview"), res, { siteUrl: siteUrl() });
+  renderTips(tips, res.options);
+  renderRanking(rec, view);
+  drawCard($("card-preview"), res, { siteUrl: siteUrl(), isBest: view.isBest, sizeMatters: rec.sizeMatters });
+}
+
+const acctName = (rec, c) => (rec.sizeMatters ? `${c.plan.name} · ${sizeName(c.size)}` : c.plan.name);
+function renderPick(rec, view, res, animate) {
+  const best = rec.ranked[0];
+  const name = (c) => acctName(rec, c);
+  $("pick-k").textContent = view.isBest ? "Best account for how you trade" : "You're comparing";
+  $("pick-name").textContent = name(view);
+  $("pick").classList.toggle("is-best", view.isBest);
+  const n = rec.ranked.length;
+  const runner = rec.ranked[1];
+  let why;
+  if (view.isBest) {
+    const same = (a, b) => Math.round(a * 100) === Math.round(b * 100);
+    why = `#1 of ${n} ${rec.sizeMatters ? "accounts" : "plans"} for your strategy`;
+    if (!runner) why += ".";
+    else if (!same(best.pass, runner.pass)) why += `, ahead of ${name(runner)} (${pct(best.pass)} vs ${pct(runner.pass)} chance to pass).`;
+    else if (!same(best.fail, runner.fail)) why += `. Same pass chance as ${name(runner)}, but fewer breaches.`;
+    else if ((best.median ?? 0) !== (runner.median ?? 0)) why += `. Same odds as ${name(runner)}, but a faster pass.`;
+    else why += `. ${name(runner)} is just as good for you, so pick whichever is cheaper.`;
+    if (!rec.sizeMatters) why += " You risk a % of the account, so every size has the same odds: buy the size that fits your budget.";
+  } else {
+    const gap = Math.round((best.pass - res.probability.pass) * 100);
+    why = `Our pick is ${name(best)}` + (gap > 0 ? `, about ${gap} points more likely to pass.` : "; this one is about as good.");
+  }
+  $("pick-why").textContent = `${why} ${ruleLine(view.plan, view.size)}`;
+  if (animate && !reduceMotion.matches) {
+    const el = $("pick-name");
+    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+  }
 }
 
 function renderHero(r) {
   const p = r.probability;
   const o = r.options;
-  const passLabel = `chance to pass within ${o.days} days`;
+  const noLimit = o.days >= 365;
+  const passLabel = noLimit ? "chance to pass (no time limit)" : `chance to pass within ${o.days} days`;
   animatePass(p.pass);
   $("pass-label").textContent = passLabel;
   $("oddsbar-pct").textContent = pct(p.pass);
-  $("oddsbar-label").textContent = `to pass in ${o.days} days`;
+  $("oddsbar-label").textContent = noLimit ? "to pass" : `to pass in ${o.days} days`;
   const rd = r.room.lossesToDailyBreach;
-  $("risk-hint").textContent = `${money(o.riskPct * o.startBalance)} a trade · ` +
-    (rd == null ? `${r.room.lossesToMaxDDBreach} losers in a row end the challenge` : `${rd} losers in one day end the challenge`);
+  const riskText = unit() === "usd"
+    ? `${num(o.riskPct * 100)}% of a ${sizeName(o.startBalance)} account`
+    : `${money(o.riskPct * o.startBalance)} on a ${sizeName(o.startBalance)} account`;
+  $("risk-hint").textContent = `${riskText} · ` +
+    (rd == null ? `${r.room.lossesToMaxDDBreach} losers in a row end the ${o.plan.name} challenge` : `${rd} losers in one day end the ${o.plan.name} challenge`);
+  $("view-size").hidden = !(lastRec && lastRec.rec.sizeMatters);
   const parts = [
     ["Passed", p.pass, "--pass"],
     ["Daily loss breach", p.dll, "--dll"],
@@ -269,7 +355,11 @@ function drawPaths(r, progress = 1) {
   for (const p of r.paths) for (const e of p.equity) { if (e < lo) lo = e; if (e > hi) hi = e; }
   const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
   const L = 58, R = 10, T = 10, B = 24;
-  const X = (d) => L + (d / o.days) * (W - L - R);
+  // Zoom the x axis to where the runs actually end, so a 365-day window isn't mostly empty.
+  let xMax = 0;
+  for (const p of r.paths) xMax = Math.max(xMax, p.outcome === "open" ? o.days : p.endDay);
+  xMax = Math.max(5, Math.min(o.days, Math.ceil(xMax * 1.05)));
+  const X = (d) => L + (Math.min(d, xMax) / xMax) * (W - L - R);
   const Y = (e) => T + (1 - (e - lo) / (hi - lo)) * (H - T - B);
 
   ctx.font = `12px ui-sans-serif, system-ui, sans-serif`;
@@ -286,7 +376,7 @@ function drawPaths(r, progress = 1) {
   const counts = { pass: 0, dll: 0, maxdd: 0, open: 0 };
   ctx.lineWidth = 1.25;
   ctx.globalAlpha = 0.55;
-  const cutoff = progress * o.days;
+  const cutoff = progress * xMax;
   const ends = [];
   for (const p of r.paths) {
     counts[p.outcome]++;
@@ -319,7 +409,7 @@ function drawPaths(r, progress = 1) {
   line(floor, colors.maxdd, "floor", [6, 4]);
 
   ctx.fillStyle = css("--muted"); ctx.textBaseline = "alphabetic";
-  [[0, "left"], [Math.round(o.days / 2), "center"], [o.days, "right"]].forEach(([d, align]) => {
+  [[0, "left"], [Math.round(xMax / 2), "center"], [xMax, "right"]].forEach(([d, align]) => {
     ctx.textAlign = align;
     ctx.fillText(`day ${d}`, X(d), H - 6);
   });
@@ -328,55 +418,50 @@ function drawPaths(r, progress = 1) {
     `Green passed (${counts.pass}), orange hit the daily loss limit (${counts.dll}), red hit max drawdown (${counts.maxdd}), grey still going (${counts.open}). Dashed lines: profit target and drawdown floor.`;
 }
 
-function renderTips(opts, base) {
-  const variants = [];
-  const rm = base.room;
-  if (opts.riskPct > 0.001) variants.push([`Risk ${num(opts.riskPct * 50)}% a trade instead of ${num(opts.riskPct * 100)}%`, { riskPct: opts.riskPct / 2 }]);
-  variants.push([`Risk ${num(opts.riskPct * 150)}% a trade`, { riskPct: opts.riskPct * 1.5 }]);
-  if (!opts.maxLossesPerDay && rm.lossesToDailyBreach && rm.lossesToDailyBreach > 1 && opts.tradesPerDay >= rm.lossesToDailyBreach) {
-    const n = rm.lossesToDailyBreach - 1;
-    variants.push([`Stop for the day after ${n} loss${n > 1 ? "es" : ""}`, { maxLossesPerDay: n }]);
-  }
-  if (opts.winRate <= 0.95) variants.push([`Win 5 more trades in 100 (${Math.round(opts.winRate * 100 + 5)}%)`, { winRate: opts.winRate + 0.05 }]);
-  if (opts.costR >= 0.02) variants.push([`Halve your costs (better fills, fewer fees)`, { costR: opts.costR / 2 }]);
-  if (opts.tradesPerDay > 1) variants.push([`Take ${opts.tradesPerDay - 1} trade${opts.tradesPerDay - 1 > 1 ? "s" : ""} a day`, { tradesPerDay: opts.tradesPerDay - 1 }]);
-
-  const rows = variants.map(([label, change]) => {
-    const r = simulate({ ...opts, ...change, runs: 4000 });
-    return {
-      label,
-      passPts: Math.round((r.probability.pass - base.probability.pass) * 100),
-      failPts: Math.round((r.probability.fail - base.probability.fail) * 100),
-      pass: r.probability.pass,
-      fail: r.probability.fail,
-    };
-  }).sort((a, b) => (b.passPts - b.failPts) - (a.passPts - a.failPts));
-
+function renderTips(rows, opts) {
   const sign = (n) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n);
-  $("tips").innerHTML = rows.map(({ label, passPts, failPts, pass, fail }) => {
+  $("tips").innerHTML = rows.map(({ label, passPts, failPts, pass, fail, dayDelta }) => {
     const passCls = passPts > 0 ? "delta-up" : passPts < 0 ? "delta-down" : "muted";
     const failCls = failPts < 0 ? "delta-up" : failPts > 0 ? "delta-down" : "muted";
-    return `<li><span>${label}</span><span class="small"><span class="${passCls}">pass ${pct(pass)} (${sign(passPts)})</span> · <span class="${failCls}">fail ${pct(fail)} (${sign(failPts)})</span></span></li>`;
+    const speed = dayDelta == null || Math.abs(dayDelta) < 2 ? ""
+      : ` · <span class="${dayDelta < 0 ? "delta-up" : "delta-down"}">${Math.abs(dayDelta)} days ${dayDelta < 0 ? "faster" : "slower"}</span>`;
+    return `<li><span>${label}</span><span class="small"><span class="${passCls}">pass ${pct(pass)} (${sign(passPts)})</span> · <span class="${failCls}">fail ${pct(fail)} (${sign(failPts)})</span>${speed}</span></li>`;
   }).join("");
   const slow = rows.some((r) => r.passPts < 0 && r.failPts < 0);
   $("tips-note").textContent = slow
-    ? `Changes that lower both numbers make you slower, not worse: fewer failures, but more runs still going at day ${opts.days}. There's no time limit, so a slower pass still counts.`
+    ? (opts.days >= 365 ? "Changes that lower both numbers mostly make you slower: fewer failures, more runs still going after a year." : `Changes that lower both numbers make you slower, not worse: fewer failures, but more runs still going at day ${opts.days}.`)
     : "";
 }
 
-function renderPlans(opts) {
-  const ranked = rankPlans({ ...opts, runs: 6000 });
-  const bestId = ranked[0].plan.id;
-  $("plans-table").tBodies[0].innerHTML = ranked.map(({ plan, result }) => {
-    const p = result.probability;
-    const cls = [plan.id === bestId ? "best" : "", plan.id === opts.plan.id ? "current" : ""].join(" ");
-    return `<tr class="${cls}"><td>${plan.name}</td><td class="num">${pct(plan.target)}</td><td class="num">${plan.dll == null ? "none" : pct(plan.dll)}</td><td class="num">${pct(plan.maxDD)}</td><td class="num">${pct(p.pass)}</td><td class="num">${pct(p.fail)}</td><td class="num">${result.passDays.median ?? "–"}</td></tr>`;
+function renderRanking(rec, view) {
+  const label = (c) => acctName(rec, c);
+  $("plans-table").tBodies[0].innerHTML = rec.ranked.map((c, i) => {
+    const p = c;
+    const isView = c.plan.id === view.plan.id && (!rec.sizeMatters || c.size === view.size);
+    const cls = [i === 0 ? "best" : "", isView && !view.isBest ? "current" : ""].join(" ");
+    const key = `${c.plan.id}|${c.size}`;
+    return `<tr class="${cls}" data-key="${key}" tabindex="0" title="Show this account"><td>${i + 1}</td><td>${label(c)}</td><td class="num">${pct(c.plan.target)}</td><td class="num">${c.plan.dll == null ? "none" : pct(c.plan.dll)}</td><td class="num">${pct(c.plan.maxDD)}</td><td class="num">${pct(p.pass)}</td><td class="num">${pct(p.fail)}</td><td class="num">${c.median ?? "–"}</td></tr>`;
   }).join("");
-  const best = ranked[0];
-  $("plans-note").textContent = best.plan.id === opts.plan.id
-    ? `Your plan is already the best fit for these stats. Prices differ between plans; check them on the site.`
-    : `${best.plan.name} gives these stats the best odds. Prices differ between plans; check them on the site.`;
+  const notes = [];
+  notes.push(rec.sizeMatters
+    ? "You risk a fixed dollar amount, so bigger accounts give you more room. Click a row to see that account."
+    : "You risk a % of the account, so size doesn't change the odds. Click a row to see that plan.");
+  if (rec.skipped) notes.push(`Left out ${rec.skipped} account${rec.skipped > 1 ? "s" : ""} where your dollar risk is half the account or more.`);
+  notes.push("Prices differ between plans and sizes; check them on the site.");
+  $("plans-note").textContent = notes.join(" ");
 }
+$("plans-table").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr[data-key]");
+  if (!tr || !lastRec) return;
+  const [planId, size] = tr.dataset.key.split("|");
+  const isBest = tr.classList.contains("best");
+  $("view-plan").value = isBest ? "auto" : planId;
+  $("view-size").value = isBest || !lastRec.rec.sizeMatters ? "auto" : size;
+  clearTimeout(timer);
+  runOdds(true);
+  $("results").scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "start" });
+});
+$("plans-table").addEventListener("keydown", (e) => { if (e.key === "Enter") e.target.closest("tr[data-key]")?.click(); });
 
 /* ---------- share ---------- */
 function siteUrl() {
@@ -385,7 +470,11 @@ function siteUrl() {
 function shareText() {
   const r = lastResult;
   if (!r) return "";
-  return `I ran my stats through 10,000 simulated ${r.options.plan.name} challenges: ${pct(r.probability.pass)} chance to pass within ${r.options.days} days. What are your odds?`;
+  const acct = lastRec && lastRec.rec.sizeMatters ? `${r.options.plan.name} ${sizeName(r.options.startBalance)}` : r.options.plan.name;
+  const when = r.options.days >= 365 ? "" : ` within ${r.options.days} days`;
+  return lastRec && lastRec.view.isBest
+    ? `Pass Odds says the best challenge for how I trade is ${acct}: ${pct(r.probability.pass)} chance to pass${when}. Which one fits yours?`
+    : `I ran my strategy through 10,000 simulated ${acct} challenges: ${pct(r.probability.pass)} chance to pass${when}.`;
 }
 $("dl-card").addEventListener("click", () => {
   $("card-preview").toBlob((blob) => {
@@ -418,12 +507,17 @@ $("odds-form").addEventListener("submit", (e) => e.preventDefault());
 for (const b of document.querySelectorAll("[data-preset]")) {
   b.addEventListener("click", () => {
     for (const [k, v] of Object.entries(PRESETS[b.dataset.preset])) $(k).value = v;
+    document.querySelector("input[name=unit][value=pct]").checked = true;
+    $("view-plan").value = "auto";
+    $("view-size").value = "auto";
     for (const x of document.querySelectorAll("[data-preset]")) x.classList.toggle("active", x === b);
     clearTimeout(timer);
     runOdds(true);
   });
 }
-$("plan").addEventListener("change", () => { clearTimeout(timer); runOdds(true); });
+for (const id of ["view-plan", "view-size"]) $(id).addEventListener("change", () => { clearTimeout(timer); runOdds(true); });
+for (const r of document.querySelectorAll("input[name=unit]")) r.addEventListener("change", () => { clearTimeout(timer); runOdds(true); });
+$("sizes").addEventListener("change", () => { clearTimeout(timer); runOdds(true); });
 window.addEventListener("resize", () => lastResult && drawPaths(lastResult));
 
 // First impression: let the page settle in, then count up and draw the runs.

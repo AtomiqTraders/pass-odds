@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { simulate, room, rankPlans, PLANS, mulberry32, expectancyR } from "../js/sim.js";
+import { simulate, room, rankPlans, recommend, SIZES, PLANS, mulberry32, expectancyR } from "../js/sim.js";
 import { sizePosition, floorToStep, atr } from "../js/sizer.js";
 
 const select = PLANS.find((p) => p.id === "select");
@@ -78,6 +78,28 @@ test("expectancy and plan ranking", () => {
   for (let i = 1; i < ranked.length; i++) {
     assert.ok(ranked[i - 1].result.probability.pass >= ranked[i].result.probability.pass);
   }
+});
+
+test("recommend: % risk ranks plans once, size can't matter", () => {
+  const r = recommend({ unit: "pct", riskPct: 0.005, winRate: 0.45, avgWinR: 2, avgLossR: 1, costR: 0.05, tradesPerDay: 3, days: 60 });
+  assert.equal(r.sizeMatters, false);
+  assert.equal(r.ranked.length, PLANS.length);
+  for (let i = 1; i < r.ranked.length; i++) assert.ok(r.ranked[i - 1].result.probability.pass >= r.ranked[i].result.probability.pass);
+});
+
+test("recommend: fixed $ risk prefers bigger accounts and skips impossible ones", () => {
+  // $1,500 a trade: 15% of a $10K (allowed, but awful), 1.5% of $100K.
+  const r = recommend({ unit: "usd", riskUsd: 1500, winRate: 0.45, avgWinR: 2, avgLossR: 1, costR: 0.05, tradesPerDay: 3, days: 60 });
+  assert.equal(r.sizeMatters, true);
+  assert.equal(r.ranked.length, PLANS.length * SIZES.length);
+  assert.equal(r.best.size, 100000);
+  const small = r.ranked.filter((c) => c.size === 10000);
+  assert.ok(small.every((c) => c.result.probability.pass < r.best.result.probability.pass));
+  // $6,000 is over half of a $10K account: skipped there, kept elsewhere.
+  const r2 = recommend({ unit: "usd", riskUsd: 6000, sizes: [10000, 100000], winRate: 0.5, avgWinR: 2, avgLossR: 1, costR: 0, tradesPerDay: 1, days: 30 });
+  assert.equal(r2.skipped.length, PLANS.length);
+  assert.ok(r2.ranked.every((c) => c.size === 100000));
+  assert.throws(() => recommend({ unit: "usd", riskUsd: 9000, sizes: [10000], winRate: 0.5, avgWinR: 2, avgLossR: 1, costR: 0, tradesPerDay: 1, days: 30 }), /too big/);
 });
 
 test("input validation", () => {

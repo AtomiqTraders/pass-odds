@@ -10,7 +10,26 @@ const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial
 const pct = (x) => `${Math.round(x * 100)}%`;
 const money = (x) => "$" + Math.round(x).toLocaleString("en-US");
 
-export function drawCard(canvas, result, { siteUrl = "" } = {}) {
+/** The Pass Odds mark, drawn at (x, y) with size s. Same geometry as logo.svg. */
+export function drawLogo(ctx, x, y, s) {
+  const k = s / 64;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(k, k);
+  ctx.fillStyle = C.pass;
+  ctx.beginPath(); ctx.roundRect(2, 2, 60, 60, 16); ctx.fill();
+  ctx.strokeStyle = "#06210f";
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.globalAlpha = 0.55; ctx.lineWidth = 3; ctx.setLineDash([1, 6]);
+  ctx.beginPath(); ctx.moveTo(13, 24); ctx.lineTo(51, 24); ctx.stroke();
+  ctx.globalAlpha = 1; ctx.setLineDash([]); ctx.lineWidth = 5.5;
+  ctx.beginPath(); ctx.moveTo(13, 47); ctx.lineTo(23, 38); ctx.lineTo(30, 43); ctx.lineTo(45, 17); ctx.stroke();
+  ctx.fillStyle = "#06210f";
+  ctx.beginPath(); ctx.arc(46, 16, 5.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+export function drawCard(canvas, result, { siteUrl = "", isBest = false, sizeMatters = false } = {}) {
   const ctx = canvas.getContext("2d");
   const W = canvas.width, H = canvas.height;
   const o = result.options;
@@ -27,16 +46,25 @@ export function drawCard(canvas, result, { siteUrl = "" } = {}) {
   ctx.fillRect(0, 0, W, H);
 
   // brand
-  ctx.fillStyle = C.pass;
-  ctx.beginPath(); ctx.arc(76, 74, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = C.text;
-  ctx.font = `700 26px ${FONT}`;
+  drawLogo(ctx, 60, 50, 50);
   ctx.textBaseline = "middle";
-  ctx.fillText("Pass Odds", 96, 75);
-  ctx.fillStyle = C.muted;
-  ctx.font = `500 22px ${FONT}`;
+  ctx.font = `800 30px ${FONT}`;
+  ctx.fillStyle = C.text;
+  ctx.fillText("Pass", 124, 76);
+  const pw = ctx.measureText("Pass").width;
+  ctx.fillStyle = C.pass;
+  ctx.fillText("Odds", 124 + pw + 2, 76);
+
+  // the account, as a pill
+  const acct = sizeMatters ? `${o.plan.name} · $${o.startBalance / 1000}K` : o.plan.name;
+  const label = isBest ? `Best fit for my strategy:  ${acct}` : acct;
+  ctx.font = `700 22px ${FONT}`;
+  const lw = ctx.measureText(label).width + 40;
+  roundRect(ctx, W - 60 - lw, 52, lw, 48, 24, isBest ? "rgba(61,220,132,0.14)" : C.panel);
+  if (isBest) { ctx.strokeStyle = "rgba(61,220,132,0.6)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(W - 60 - lw, 52, lw, 48, 24); ctx.stroke(); }
+  ctx.fillStyle = isBest ? C.pass : C.text;
   ctx.textAlign = "right";
-  ctx.fillText(`${o.plan.name} · ${money(o.startBalance)} challenge`, W - 64, 75);
+  ctx.fillText(label, W - 80, 77);
   ctx.textAlign = "left";
 
   // big number
@@ -46,7 +74,7 @@ export function drawCard(canvas, result, { siteUrl = "" } = {}) {
   ctx.fillText(pct(p.pass), 60, 340);
   ctx.fillStyle = C.text;
   ctx.font = `600 34px ${FONT}`;
-  ctx.fillText(`chance to pass in ${o.days} days`, 66, 395);
+  ctx.fillText(o.days >= 365 ? "chance to pass" : `chance to pass in ${o.days} days`, 66, 395);
 
   // right column: outcome breakdown
   const x0 = 640, w = 496;
@@ -57,7 +85,7 @@ export function drawCard(canvas, result, { siteUrl = "" } = {}) {
     ["Passed", p.pass, C.pass],
     ["Hit the daily loss limit", p.dll, C.dll],
     ["Hit max drawdown", p.maxdd, C.maxdd],
-    [`Still going after ${o.days} days`, p.open, C.open],
+    [o.days >= 365 ? "Still going after a year" : `Still going after ${o.days} days`, p.open, C.open],
   ];
   // bar
   let x = x0;
@@ -109,12 +137,11 @@ export function drawCard(canvas, result, { siteUrl = "" } = {}) {
   // footer
   ctx.fillStyle = C.muted;
   ctx.font = `500 18px ${FONT}`;
-  ctx.fillText("A simulation, not a promise. Unofficial tool, not affiliated with MyFundedPerps.", 60, 630);
+  ctx.fillText("Simulated, not real results. Discipline decides who passes. Unofficial, not affiliated with MyFundedPerps.", 60, siteUrl ? 612 : 630);
   if (siteUrl) {
-    ctx.textAlign = "right";
-    ctx.fillStyle = C.text;
-    ctx.fillText(siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""), W - 60, 630);
-    ctx.textAlign = "left";
+    ctx.fillStyle = C.pass;
+    ctx.font = `700 19px ${FONT}`;
+    ctx.fillText(`Find yours: ${siteUrl.replace(/^https?:\/\//, "").replace(/\/$/, "")}`, 60, 644);
   }
 }
 

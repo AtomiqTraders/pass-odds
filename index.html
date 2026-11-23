@@ -4,25 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pass Odds</title>
-  <meta name="description" content="Free challenge calculator for MyFundedPerps traders: your odds of passing, the plan that suits your stats, and a position size the market will accept. No login, no key.">
-  <meta property="og:title" content="Pass Odds: what are your odds of passing?">
-  <meta property="og:description" content="Simulate 10,000 challenges with your own stats against the real plan rules. Free, no login.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%233ddc84'/%3E%3Cpath d='M9 19l5-5 4 4 6-7' stroke='%2306210f' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <meta name="description" content="Find the MyFundedPerps challenge that fits how you trade. Pass Odds simulates every plan and size with your stats and recommends the account with the best chance to pass. Free, no login, no key.">
+  <meta property="og:title" content="Pass Odds: which challenge should you buy?">
+  <meta property="og:image" content="https://atomiqtraders.github.io/pass-odds/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:description" content="Your strategy in, the best-fit challenge account out. Free, no login.">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><span class="dot" aria-hidden="true"></span> Pass Odds
+    <div class="brand"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="2" y="2" width="60" height="60" rx="16" fill="var(--accent)"/><path d="M13 24H51" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 6" opacity=".55"/><path class="logo-line" d="M13 47L23 38L30 43L45 17" fill="none" stroke="var(--accent-ink)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/><circle class="logo-dot" cx="46" cy="16" r="5.5" fill="var(--accent-ink)"/></svg><span class="wordmark">Pass<span>Odds</span></span>
       <button class="btn theme-toggle" id="theme" type="button" aria-label="Switch light or dark theme">Theme</button>
     </div>
-    <h1>What are your odds of <span class="shine">passing?</span></h1>
-    <p class="lede">Enter your trading stats. Pass Odds plays out 10,000 MyFundedPerps challenges with them, under the plan's real rules, and shows how often you pass, how you fail, and what would change the odds.</p>
+    <h1>Which challenge should you <span class="shine">buy?</span></h1>
+    <p class="lede">Tell Pass Odds how you trade. It plays out thousands of challenges on every MyFundedPerps plan and account size, then tells you which account gives your strategy the best chance to pass, and why. It's a guide for choosing an account, not a prediction: whether you pass is up to your discipline.</p>
     <ul class="chips"><li>Free</li><li>No login</li><li>No API key</li><li>Runs in your browser</li></ul>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Tools">
-    <button role="tab" id="tab-odds" aria-controls="view-odds" aria-selected="true">Pass odds</button>
+    <button role="tab" id="tab-odds" aria-controls="view-odds" aria-selected="true">Find my account</button>
     <button role="tab" id="tab-size" aria-controls="view-size" aria-selected="false">Position sizer</button>
   </nav>
 
@@ -37,24 +39,9 @@
           <button type="button" class="btn" data-preset="yolo">Over-risker</button>
         </div>
 
-        <fieldset>
-          <legend>1 · Your challenge</legend>
-          <div class="row2">
-            <div class="field">
-              <label for="plan">Plan</label>
-              <select id="plan" name="plan"></select>
-            </div>
-            <div class="field">
-              <label for="balance">Account size ($)</label>
-              <input id="balance" name="balance" type="number" inputmode="decimal" min="1000" step="1000" value="100000" list="sizes">
-              <datalist id="sizes"><option value="10000"><option value="25000"><option value="50000"><option value="100000"></datalist>
-            </div>
-          </div>
-          <p class="hint" id="plan-hint"></p>
-        </fieldset>
 
         <fieldset>
-          <legend>2 · Your edge</legend>
+          <legend>1 · How you trade</legend>
           <div class="field">
             <div class="labelrow"><label for="winRate">Win rate</label><span class="readout"><input id="winRate" name="winRate" type="number" inputmode="decimal" min="0" max="100" step="1" value="45" aria-label="Win rate in percent">%</span></div>
             <input type="range" min="10" max="90" step="1" value="45" data-sync="winRate" aria-label="Win rate slider">
@@ -77,12 +64,23 @@
         </fieldset>
 
         <fieldset>
-          <legend>3 · Your risk</legend>
+          <legend>2 · How you risk</legend>
           <div class="field">
+            <span class="fieldlabel" id="unit-label">I size my risk as</span>
+            <div class="seg" role="radiogroup" aria-labelledby="unit-label">
+              <label><input type="radio" name="unit" value="pct" checked> % of the account</label>
+              <label><input type="radio" name="unit" value="usd"> Fixed $ a trade</label>
+            </div>
+          </div>
+          <div class="field" id="risk-pct-field">
             <div class="labelrow"><label for="riskPct">Risk per trade</label><span class="readout"><input id="riskPct" name="riskPct" type="number" inputmode="decimal" min="0.05" max="10" step="0.05" value="0.5" aria-label="Risk per trade in percent">%</span></div>
             <input type="range" min="0.1" max="3" step="0.05" value="0.5" data-sync="riskPct" aria-label="Risk per trade slider">
-            <span class="hint" id="risk-hint"></span>
           </div>
+          <div class="field" id="risk-usd-field" hidden>
+            <div class="labelrow"><label for="riskUsd">Risk per trade</label><span class="readout">$<input id="riskUsd" name="riskUsd" type="number" inputmode="decimal" min="1" step="10" value="250" aria-label="Risk per trade in dollars"></span></div>
+            <input type="range" min="25" max="2000" step="25" value="250" data-sync="riskUsd" aria-label="Risk per trade in dollars slider">
+          </div>
+          <span class="hint" id="risk-hint"></span>
           <div class="row2">
             <div class="field">
               <label for="tradesPerDay">Trades a day</label>
@@ -95,16 +93,40 @@
             </div>
           </div>
           <div class="field">
-            <label for="days">Look ahead (days)</label>
-            <input id="days" name="days" type="number" inputmode="numeric" min="1" max="365" step="1" value="60">
-            <span class="hint">There's no time limit on the challenge. This only sets how far the simulation looks.</span>
+            <label for="days">Your deadline (days)</label>
+            <input id="days" name="days" type="number" inputmode="numeric" min="1" max="365" step="1" value="365">
+            <span class="hint">The challenge has no time limit; 365 means none. Lower it if you want to pass by a certain date.</span>
           </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>3 · Sizes you'd buy</legend>
+          <div class="chipsel" id="sizes" role="group" aria-label="Account sizes to consider">
+            <label><input type="checkbox" value="10000" checked> $10K</label>
+            <label><input type="checkbox" value="25000" checked> $25K</label>
+            <label><input type="checkbox" value="50000" checked> $50K</label>
+            <label><input type="checkbox" value="100000" checked> $100K</label>
+          </div>
+          <p class="hint">Untick sizes outside your budget. Check the site for current sizes and prices.</p>
         </fieldset>
       </form>
 
       <div>
         <div class="panel" aria-live="polite" id="results">
           <div id="odds-error" class="err" hidden></div>
+          <div class="pick" id="pick">
+            <div class="pick-k" id="pick-k">Best account for how you trade</div>
+            <div class="pick-name" id="pick-name">–</div>
+            <p class="pick-why" id="pick-why"></p>
+            <div class="pick-alt">
+              <label for="view-plan" class="small muted">Showing</label>
+              <select id="view-plan" aria-label="Plan to show"><option value="auto">Best plan</option></select>
+              <select id="view-size" aria-label="Size to show"><option value="auto">Best size</option></select>
+            </div>
+          </div>
+          <aside class="reality" role="note">
+            <strong>Reality check:</strong> these numbers come from a simulation, not real trades. Traders pass or blow accounts mostly on self-control: sticking to their stop, their risk and their own rules. Pass Odds can't trade for you; it only helps you pick the account that suits your strategy.
+          </aside>
           <div class="hero" id="hero">
             <div>
               <div class="big" id="pass-pct">–</div>
@@ -133,10 +155,10 @@
         </div>
 
         <div class="panel">
-          <h2>Which plan suits your stats</h2>
+          <h2>Every account, ranked for you</h2>
           <div class="tablewrap">
             <table id="plans-table">
-              <thead><tr><th>Plan</th><th class="num">Target</th><th class="num">Daily loss</th><th class="num">Max drawdown</th><th class="num">Pass</th><th class="num">Breach</th><th class="num">Typical days</th></tr></thead>
+              <thead><tr><th>#</th><th>Account</th><th class="num">Target</th><th class="num">Daily loss</th><th class="num">Max drawdown</th><th class="num">Pass</th><th class="num">Breach</th><th class="num">Typical days</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -144,7 +166,7 @@
         </div>
 
         <div class="panel">
-          <h2>Share your odds</h2>
+          <h2>Share your pick</h2>
           <canvas id="card-preview" width="1200" height="675" role="img" aria-label="Shareable odds card"></canvas>
           <div class="actions">
             <button class="btn primary" type="button" id="dl-card">Download image</button>
@@ -220,7 +242,8 @@
   <a href="#results" class="oddsbar" id="oddsbar" hidden><span id="oddsbar-pct">–</span> <span id="oddsbar-label">chance to pass</span><span class="go">See results ↓</span></a>
 
   <footer>
-    <p><strong>Unofficial community tool.</strong> Not made by or affiliated with MyFundedPerps. Not financial advice. A simulation is not a promise: real trades vary more than these averages, and past stats don't guarantee future results.</p>
+    <p><strong>Simulated results, not real ones.</strong> Pass Odds plays out your stats many times to compare accounts. Real results depend most on your discipline: following your stop, your risk per trade and your own daily rules. Treat the numbers as a guide for choosing an account, never as a promise that you'll pass.</p>
+    <p><strong>Unofficial community tool.</strong> Not made by or affiliated with MyFundedPerps. Not financial advice. Real trades vary more than these averages, and past stats don't guarantee future results.</p>
     <p>Rules from the <a id="rules-link" href="#" rel="noopener">MyFundedPerps challenge guide</a>, as of <span id="rules-date"></span>. Check your account's trading policy for the live values. Market data: MyFundedPerps public market list (<span id="markets-date">loading</span>), prices from Binance and Hyperliquid public feeds.</p>
     <p>How it works: each trade wins your average win or loses your average loss, minus costs. A losing trade goes straight to its stop. Daily loss is counted from the balance at the start of each day (midnight New York time) and reaching a limit counts as a breach.</p>
   </footer>

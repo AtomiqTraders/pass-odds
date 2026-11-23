@@ -169,6 +169,44 @@ export function room(opts) {
   };
 }
 
+/** Account sizes the recommender considers (check the site for what's on sale). */
+export const SIZES = [10000, 25000, 50000, 100000];
+
+/**
+ * Recommend an account for a strategy.
+ * strategy.unit "pct": risk is a share of the account, so size can't change the
+ *   odds; plans are ranked once and any size is equal.
+ * strategy.unit "usd": risk is a fixed dollar amount, so a bigger account means a
+ *   smaller share at risk; every plan x size is ranked.
+ * Ranked by pass chance, then by lower breach chance.
+ */
+export function recommend(strategy, { plans = PLANS, sizes = SIZES, runs = 4000 } = {}) {
+  const { unit = "pct", riskPct, riskUsd, sizes: chosen, ...rest } = strategy;
+  const pool = (chosen && chosen.length ? chosen : sizes).slice().sort((a, b) => a - b);
+  const sizeMatters = unit === "usd";
+  const candidates = [];
+  const skipped = [];
+  for (const plan of plans) {
+    for (const size of sizeMatters ? pool : [pool[pool.length - 1]]) {
+      const share = sizeMatters ? riskUsd / size : riskPct;
+      if (!(share > 0 && share < 0.5)) { skipped.push({ plan, size, reason: "risk too large for this size" }); continue; }
+      candidates.push({ plan, size, opts: { ...rest, plan, startBalance: size, riskPct: share } });
+    }
+  }
+  if (!candidates.length) throw new Error(sizeMatters ? "That dollar risk is too big for every size you picked." : "Risk per trade must be between 0% and 50%.");
+  // Rank by pass chance in whole points (finer gaps are simulation noise),
+  // then fewer breaches, then a faster typical pass.
+  const ranked = candidates
+    .map((c) => ({ ...c, result: simulate({ ...c.opts, runs, keepPaths: 0 }) }))
+    .sort((a, b) => {
+      const pa = a.result.probability, pb = b.result.probability;
+      return (Math.round(pb.pass * 100) - Math.round(pa.pass * 100))
+        || (Math.round(pa.fail * 100) - Math.round(pb.fail * 100))
+        || ((a.result.passDays.median ?? Infinity) - (b.result.passDays.median ?? Infinity));
+    });
+  return { sizeMatters, ranked, best: ranked[0], skipped, sizes: pool };
+}
+
 /** Run every plan with the same seed and stats, best pass rate first. */
 export function rankPlans(opts, plans = PLANS) {
   return plans

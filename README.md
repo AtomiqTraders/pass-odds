@@ -1,20 +1,22 @@
 # Pass Odds
 
-**What are your odds of passing a MyFundedPerps challenge?**
+<img src="logo.svg" width="72" alt="Pass Odds logo">
 
-Pass Odds runs your own trading stats through 10,000 simulated challenges under the plan's real rules, and shows how often you pass, how you fail, and what would change the odds. It also sizes trades so the order fits the market's limits and today's loss room.
+**Which MyFundedPerps challenge should you buy?**
+
+Tell Pass Odds how you trade: win rate, average win and loss, risk per trade, trades a day. It simulates every plan and account size under the real rules and recommends the account that gives your strategy the best chance to pass. It also sizes trades so the order fits the market's limits and today's loss room.
 
 Free. No login. No API key. Everything runs in your browser.
 
-> Unofficial community tool. Not made by or affiliated with MyFundedPerps. Not financial advice. A simulation is not a promise.
+> **Simulated results, not real ones.** Traders pass or blow accounts mostly on self-control: sticking to their stop, their risk and their own rules. Pass Odds only helps you choose an account that suits your strategy. Unofficial community tool, not made by or affiliated with MyFundedPerps. Not financial advice.
 
 ## What it does
 
-**Pass odds**
-- Your chance to pass, fail on the daily loss limit, fail on max drawdown, or still be going after N days.
-- 50 sample equity paths drawn against the profit target and the drawdown floor.
-- "What would change your odds": the same stats with half the risk, an own daily stop, a few more winners, lower costs and so on, each shown as a change in pass chance.
-- Plan picker: every plan (Select, Signature, Elite with and without a daily loss limit) run on your stats and ranked.
+**Find my account**
+- Recommends the best plan (Select, Signature, Elite with or without a daily loss limit) for your strategy, and the best size too when you risk a fixed dollar amount per trade.
+- Ranks every account for you, with pass chance, breach chance and typical days to pass. Click any row to inspect it.
+- For the shown account: chance to pass, fail on the daily loss limit, fail on max drawdown, 50 sample equity paths, and "what would change your odds" (half the risk, your own daily stop, more winners, lower costs).
+- The challenge has no time limit, so by default odds are counted with no deadline; you can set your own.
 - Shareable 1200×675 image and a link that reopens the page with the same stats.
 
 **Position sizer**
@@ -69,6 +71,7 @@ The engine (`js/sim.js`) and sizer (`js/sizer.js`) are plain modules with no DOM
 ## Roadmap
 
 - **v0.1** Pass odds, plan picker, position sizer, share card.
+- **v0.1.1** Recommends the account (plan and size) from your strategy, fixed-$ risk mode, logo.
 - **v0.2** "Why did I fail?": read-only API key → replay your real fills against the limit lines and mark the trade that broke the account.
 - **v0.3** Live odds from the account stream, plus an OBS overlay for streamers.
 - Claude skill and MCP wrapper so traders can ask their own Claude for odds and sizes.
