@@ -6,6 +6,8 @@
 
 Tell Pass Odds how you trade: win rate, average win and loss, risk per trade, trades a day. It simulates every plan and account size under the real rules and recommends the account that gives your strategy the best chance to pass. It also sizes trades so the order fits the market's limits and today's loss room.
 
+**Use it: [pass-odds.vercel.app](https://pass-odds.vercel.app/)**
+
 Free. No login. No API key. Everything runs in your browser.
 
 > **Simulated results, not real ones.** Traders pass or blow accounts mostly on self-control: sticking to their stop, their risk and their own rules. Pass Odds only helps you choose an account that suits your strategy. Unofficial community tool, not made by or affiliated with MyFundedPerps. Not financial advice.
