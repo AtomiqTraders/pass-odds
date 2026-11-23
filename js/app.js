@@ -1,7 +1,7 @@
-import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js";
-import { sizePosition, atr } from "./sizer.js";
-import { fetchPrice, fetchCandles, priceSupported } from "./market.js";
-import { drawCard } from "./card.js";
+import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js?v=5";
+import { sizePosition, atr } from "./sizer.js?v=5";
+import { fetchPrice, fetchCandles, priceSupported } from "./market.js?v=5";
+import { drawCard } from "./card.js?v=5";
 
 const $ = (id) => document.getElementById(id);
 const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
@@ -33,7 +33,7 @@ function themeLabel() {
   const dark = document.documentElement.dataset.theme
     ? document.documentElement.dataset.theme === "dark"
     : matchMedia("(prefers-color-scheme: dark)").matches;
-  $("theme").textContent = dark ? "Day edition" : "Night edition";
+  $("theme").textContent = dark ? "Light" : "Dark";
 }
 themeLabel();
 
@@ -63,9 +63,9 @@ const planById = (id) => PLANS.find((p) => p.id === id) || PLANS[0];
 function sizeName(s) { return s >= 1000 ? `$${s / 1000}K` : money(s); }
 function ruleLine(p, b) {
   const amt = (x) => (b ? ` (${money(x * b)})` : "");
-  return `Make ${pct(p.target)}${amt(p.target)} to pass. ` +
-    (p.dll == null ? "No daily loss limit. " : `Lose ${pct(p.dll)}${amt(p.dll)} in a day and you're out. `) +
-    `Fall ${pct(p.maxDD)}${amt(p.maxDD)} below the start and you're out.`;
+  return `Rules: make ${pct(p.target)}${amt(p.target)}` +
+    (p.dll == null ? ", no daily limit" : `, lose no more than ${pct(p.dll)}${amt(p.dll)} in a day`) +
+    `, never drop ${pct(p.maxDD)}${amt(p.maxDD)} below the start.`;
 }
 
 /* ---------- odds form <-> URL ---------- */
@@ -184,7 +184,7 @@ function animatePass(to) {
 /* ---------- compute in a worker so sliders stay smooth ---------- */
 let worker = null;
 try {
-  worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=5", import.meta.url), { type: "module" });
 } catch { worker = null; }
 let reqId = 0;
 const pending = new Map();
@@ -198,7 +198,7 @@ if (worker) {
 }
 function compute(input) {
   if (!worker) {
-    return import("./engine.js").then(({ analyze }) => {
+    return import("./engine.js?v=5").then(({ analyze }) => {
       try { return { out: analyze(input) }; } catch (err) { return { error: err.message }; }
     });
   }
@@ -254,13 +254,13 @@ function renderPick(rec, view, res, animate) {
   let why;
   if (view.isBest) {
     const same = (a, b) => Math.round(a * 100) === Math.round(b * 100);
-    why = `#1 of ${n} ${rec.sizeMatters ? "accounts" : "plans"} for your strategy`;
+    why = `Best of ${n} ${rec.sizeMatters ? "accounts" : "plans"}`;
     if (!runner) why += ".";
-    else if (!same(best.pass, runner.pass)) why += `, ahead of ${name(runner)} (${pct(best.pass)} vs ${pct(runner.pass)} chance to pass).`;
+    else if (!same(best.pass, runner.pass)) why += `; next is ${name(runner)} at ${pct(runner.pass)}.`;
     else if (!same(best.fail, runner.fail)) why += `. Same pass chance as ${name(runner)}, but fewer breaches.`;
     else if ((best.median ?? 0) !== (runner.median ?? 0)) why += `. Same odds as ${name(runner)}, but a faster pass.`;
     else why += `. ${name(runner)} is just as good for you, so pick whichever is cheaper.`;
-    if (!rec.sizeMatters) why += " You risk a % of the account, so every size has the same odds: buy the size that fits your budget.";
+    if (!rec.sizeMatters) why += " Any size gives the same odds, so pick by budget.";
   } else {
     const gap = Math.round((best.pass - res.probability.pass) * 100);
     why = `Our pick is ${name(best)}` + (gap > 0 ? `, about ${gap} points more likely to pass.` : "; this one is about as good.");
@@ -276,9 +276,10 @@ function renderHero(r) {
   const p = r.probability;
   const o = r.options;
   const noLimit = o.days >= 365;
-  const passLabel = noLimit ? "chance to pass (no time limit)" : `chance to pass within ${o.days} days`;
+  const passLabel = noLimit ? "chance to pass" : `chance to pass within ${o.days} days`;
   animatePass(p.pass);
   $("pass-label").textContent = passLabel;
+  $("typical").textContent = r.passDays.median ? ` · usually about ${r.passDays.median} days` : "";
   $("oddsbar-pct").textContent = pct(p.pass);
   $("oddsbar-label").textContent = noLimit ? "to pass" : `to pass in ${o.days} days`;
   const rd = r.room.lossesToDailyBreach;
@@ -551,6 +552,10 @@ for (const id of ["view-plan", "view-size"]) $(id).addEventListener("change", ()
 for (const r of document.querySelectorAll("input[name=unit]")) r.addEventListener("change", () => { clearTimeout(timer); runOdds(true); });
 $("sizes").addEventListener("change", () => { clearTimeout(timer); runOdds(true); });
 window.addEventListener("resize", () => lastResult && drawPaths(lastResult));
+// The chart sits in a folded section; draw it when it opens.
+$("fold-paths").addEventListener("toggle", () => {
+  if ($("fold-paths").open && lastResult) tween(1200, (k) => drawPaths(lastResult, k), "paths");
+});
 
 // First impression: let the page settle in, then count up and draw the runs.
 requestAnimationFrame(() => setTimeout(() => runOdds(true), reduceMotion.matches ? 0 : 350));
