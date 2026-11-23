@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pass Odds</title>
+  <meta name="description" content="Free challenge calculator for MyFundedPerps traders: your odds of passing, the plan that suits your stats, and a position size the market will accept. No login, no key.">
+  <meta property="og:title" content="Pass Odds: what are your odds of passing?">
+  <meta property="og:description" content="Simulate 10,000 challenges with your own stats against the real plan rules. Free, no login.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%233ddc84'/%3E%3Cpath d='M9 19l5-5 4 4 6-7' stroke='%2306210f' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="dot" aria-hidden="true"></span> Pass Odds
+      <button class="btn theme-toggle" id="theme" type="button" aria-label="Switch light or dark theme">Theme</button>
+    </div>
+    <h1>What are your odds of <span class="shine">passing?</span></h1>
+    <p class="lede">Enter your trading stats. Pass Odds plays out 10,000 MyFundedPerps challenges with them, under the plan's real rules, and shows how often you pass, how you fail, and what would change the odds.</p>
+    <ul class="chips"><li>Free</li><li>No login</li><li>No API key</li><li>Runs in your browser</li></ul>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Tools">
+    <button role="tab" id="tab-odds" aria-controls="view-odds" aria-selected="true">Pass odds</button>
+    <button role="tab" id="tab-size" aria-controls="view-size" aria-selected="false">Position sizer</button>
+  </nav>
+
+  <!-- PASS ODDS -->
+  <section id="view-odds" role="tabpanel" aria-labelledby="tab-odds">
+    <div class="grid">
+      <form class="panel sticky" id="odds-form" autocomplete="off" novalidate>
+        <div class="presets" aria-label="Start from a trader type">
+          <span class="small muted">Start from:</span>
+          <button type="button" class="btn" data-preset="scalper">Scalper</button>
+          <button type="button" class="btn" data-preset="swing">Swing trader</button>
+          <button type="button" class="btn" data-preset="yolo">Over-risker</button>
+        </div>
+
+        <fieldset>
+          <legend>1 · Your challenge</legend>
+          <div class="row2">
+            <div class="field">
+              <label for="plan">Plan</label>
+              <select id="plan" name="plan"></select>
+            </div>
+            <div class="field">
+              <label for="balance">Account size ($)</label>
+              <input id="balance" name="balance" type="number" inputmode="decimal" min="1000" step="1000" value="100000" list="sizes">
+              <datalist id="sizes"><option value="10000"><option value="25000"><option value="50000"><option value="100000"></datalist>
+            </div>
+          </div>
+          <p class="hint" id="plan-hint"></p>
+        </fieldset>
+
+        <fieldset>
+          <legend>2 · Your edge</legend>
+          <div class="field">
+            <div class="labelrow"><label for="winRate">Win rate</label><span class="readout"><input id="winRate" name="winRate" type="number" inputmode="decimal" min="0" max="100" step="1" value="45" aria-label="Win rate in percent">%</span></div>
+            <input type="range" min="10" max="90" step="1" value="45" data-sync="winRate" aria-label="Win rate slider">
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label for="avgWinR">Average win (R)</label>
+              <input id="avgWinR" name="avgWinR" type="number" inputmode="decimal" min="0.1" step="0.1" value="2">
+            </div>
+            <div class="field">
+              <label for="avgLossR">Average loss (R)</label>
+              <input id="avgLossR" name="avgLossR" type="number" inputmode="decimal" min="0.1" step="0.1" value="1">
+            </div>
+          </div>
+          <div class="field">
+            <label for="costR">Fees and slippage per trade (R)</label>
+            <input id="costR" name="costR" type="number" inputmode="decimal" min="0" step="0.01" value="0.05">
+          </div>
+          <p class="hint">1R is what you risk on one trade. A 2R win makes twice what a full loss costs.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>3 · Your risk</legend>
+          <div class="field">
+            <div class="labelrow"><label for="riskPct">Risk per trade</label><span class="readout"><input id="riskPct" name="riskPct" type="number" inputmode="decimal" min="0.05" max="10" step="0.05" value="0.5" aria-label="Risk per trade in percent">%</span></div>
+            <input type="range" min="0.1" max="3" step="0.05" value="0.5" data-sync="riskPct" aria-label="Risk per trade slider">
+            <span class="hint" id="risk-hint"></span>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label for="tradesPerDay">Trades a day</label>
+              <input id="tradesPerDay" name="tradesPerDay" type="number" inputmode="numeric" min="1" max="50" step="1" value="3">
+            </div>
+            <div class="field">
+              <label for="maxLossesPerDay">Stop after losses</label>
+              <input id="maxLossesPerDay" name="maxLossesPerDay" type="number" inputmode="numeric" min="0" max="50" step="1" value="0">
+              <span class="hint">Your own daily rule. 0 = none.</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="days">Look ahead (days)</label>
+            <input id="days" name="days" type="number" inputmode="numeric" min="1" max="365" step="1" value="60">
+            <span class="hint">There's no time limit on the challenge. This only sets how far the simulation looks.</span>
+          </div>
+        </fieldset>
+      </form>
+
+      <div>
+        <div class="panel" aria-live="polite" id="results">
+          <div id="odds-error" class="err" hidden></div>
+          <div class="hero" id="hero">
+            <div>
+              <div class="big" id="pass-pct">–</div>
+              <div class="muted small" id="pass-label">chance to pass</div>
+            </div>
+            <div>
+              <div class="stackbar" id="stackbar" aria-hidden="true"></div>
+              <ul class="legend" id="legend"></ul>
+              <p class="verdict" id="verdict"></p>
+            </div>
+          </div>
+          <div class="stats" id="stats"></div>
+          <div id="room-warn" class="warn" hidden></div>
+        </div>
+
+        <div class="panel">
+          <h2>50 of the simulated challenges</h2>
+          <canvas class="chart" id="paths" role="img" aria-label="Equity paths of 50 simulated challenges"></canvas>
+          <div class="chart-legend" id="paths-legend"></div>
+        </div>
+
+        <div class="panel">
+          <h2>What would change your odds</h2>
+          <ul class="tips" id="tips"></ul>
+          <p class="small muted" id="tips-note"></p>
+        </div>
+
+        <div class="panel">
+          <h2>Which plan suits your stats</h2>
+          <div class="tablewrap">
+            <table id="plans-table">
+              <thead><tr><th>Plan</th><th class="num">Target</th><th class="num">Daily loss</th><th class="num">Max drawdown</th><th class="num">Pass</th><th class="num">Breach</th><th class="num">Typical days</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="small muted" id="plans-note"></p>
+        </div>
+
+        <div class="panel">
+          <h2>Share your odds</h2>
+          <canvas id="card-preview" width="1200" height="675" role="img" aria-label="Shareable odds card"></canvas>
+          <div class="actions">
+            <button class="btn primary" type="button" id="dl-card">Download image</button>
+            <button class="btn" type="button" id="copy-link">Copy link to these stats</button>
+            <button class="btn" type="button" id="post-x">Post on X</button>
+          </div>
+          <p class="small muted" id="share-status" aria-live="polite"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- POSITION SIZER -->
+  <section id="view-size" role="tabpanel" aria-labelledby="tab-size" hidden>
+    <div class="grid">
+      <form class="panel" id="size-form" autocomplete="off" novalidate>
+        <h2>Size a trade</h2>
+        <div class="field">
+          <label for="market">Market</label>
+          <select id="market" name="market"></select>
+          <span class="hint" id="market-hint"></span>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="s-equity">Equity ($)</label>
+            <input id="s-equity" type="number" inputmode="decimal" min="1" step="100" value="100000">
+          </div>
+          <div class="field">
+            <label for="s-risk">Risk ($)</label>
+            <input id="s-risk" type="number" inputmode="decimal" min="0" step="10" value="500">
+          </div>
+        </div>
+        <div class="field">
+          <label for="s-entry">Entry price</label>
+          <div class="inline">
+            <input id="s-entry" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 97000">
+            <button class="btn" type="button" id="live-price">Live price</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="s-stop">Stop price</label>
+          <div class="inline">
+            <input id="s-stop" type="number" inputmode="decimal" min="0" step="any" placeholder="Below entry = long">
+            <button class="btn" type="button" id="atr-stop" title="Stop 1.5 × the 1-hour ATR below the entry">ATR stop</button>
+          </div>
+          <span class="hint">Stop below the entry sizes a long, above sizes a short.</span>
+        </div>
+        <h3>Today's room (optional)</h3>
+        <div class="row2">
+          <div class="field">
+            <label for="s-plan">Plan</label>
+            <select id="s-plan"></select>
+          </div>
+          <div class="field">
+            <label for="s-lost">Lost today ($)</label>
+            <input id="s-lost" type="number" inputmode="decimal" min="0" step="10" value="0">
+          </div>
+        </div>
+        <div class="field">
+          <label for="s-start">Starting balance ($)</label>
+          <input id="s-start" type="number" inputmode="decimal" min="1" step="1000" value="100000">
+          <span class="hint">The plan's limits are a share of this.</span>
+        </div>
+        <p class="small muted" id="price-status" aria-live="polite"></p>
+      </form>
+
+      <div class="panel size-out" aria-live="polite" id="size-out">
+        <p class="muted">Pick a market, then enter an entry and a stop.</p>
+      </div>
+    </div>
+  </section>
+
+  <a href="#results" class="oddsbar" id="oddsbar" hidden><span id="oddsbar-pct">–</span> <span id="oddsbar-label">chance to pass</span><span class="go">See results ↓</span></a>
+
+  <footer>
+    <p><strong>Unofficial community tool.</strong> Not made by or affiliated with MyFundedPerps. Not financial advice. A simulation is not a promise: real trades vary more than these averages, and past stats don't guarantee future results.</p>
+    <p>Rules from the <a id="rules-link" href="#" rel="noopener">MyFundedPerps challenge guide</a>, as of <span id="rules-date"></span>. Check your account's trading policy for the live values. Market data: MyFundedPerps public market list (<span id="markets-date">loading</span>), prices from Binance and Hyperliquid public feeds.</p>
+    <p>How it works: each trade wins your average win or loses your average loss, minus costs. A losing trade goes straight to its stop. Daily loss is counted from the balance at the start of each day (midnight New York time) and reaching a limit counts as a breach.</p>
+  </footer>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
