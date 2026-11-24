@@ -50,6 +50,8 @@ a { color: inherit; }
 .nav-in { max-width: 1180px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 24px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font: 600 18px var(--sans); text-decoration: none; margin-right: auto; color: var(--hero-ink); }
 .brand img { display: block; }
+.nav-link { color: var(--hero-muted); font: 500 15px var(--sans); text-decoration: none; white-space: nowrap; }
+.nav-link:hover { color: var(--hero-ink); }
 .tabs { display: flex; gap: 6px; }
 .tabs button { appearance: none; border: 0; background: none; color: var(--hero-muted); font: 500 15px var(--sans); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
 .tabs button:hover { color: var(--hero-ink); }
