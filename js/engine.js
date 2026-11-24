@@ -1,6 +1,6 @@
 // Everything the "Find my account" view needs, computed in one pure call so it
 // can run in a Web Worker (keeps sliders smooth) or directly as a fallback.
-import { PLANS, simulate, recommend } from "./sim.js?v=6";
+import { PLANS, simulate, recommend } from "./sim.js?v=8";
 
 const RANK_RUNS = 10000;
 const RANK_RUNS_USD = 3000;

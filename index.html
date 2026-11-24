@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.binance.com https://fapi.binance.com https://api.hyperliquid.xyz; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Pass Odds</title>
   <meta name="description" content="Find the MyFundedPerps challenge built for how you trade. Pass Odds tests your numbers on every plan and size and recommends the best one. Free, no login, no key.">
@@ -13,11 +13,11 @@
   <link rel="canonical" href="https://pass-odds.vercel.app/">
   <meta name="twitter:card" content="summary_large_image">
   <meta property="og:description" content="Your numbers in, the best-fit challenge account out. Free, no login.">
-  <link rel="icon" href="logo.svg?v=6" type="image/svg+xml">
+  <link rel="icon" href="logo.svg?v=8" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
 
@@ -25,17 +25,13 @@
 
 <header class="nav">
   <div class="nav-in">
-    <a class="brand" href="./"><img src="logo.svg?v=6" alt="" width="28" height="28"> Pass Odds</a>
-    <nav class="tabs" role="tablist" aria-label="Tools">
-      <button role="tab" id="tab-odds" aria-controls="view-odds" aria-selected="true">Find my account</button>
-      <button role="tab" id="tab-size" aria-controls="view-size" aria-selected="false">Position sizer</button>
-    </nav>
+    <a class="brand" href="./"><img src="logo.svg?v=8" alt="" width="28" height="28"> Pass Odds</a>
     <button class="pill ghost" id="theme" type="button">Dark</button>
   </div>
 </header>
 
 <!-- FIND MY ACCOUNT -->
-<section id="view-odds" role="tabpanel" aria-labelledby="tab-odds">
+<section id="view-odds">
   <div class="hero">
     <h1>Find the challenge<br>built for you</h1>
     <p class="hero-sub">Tell us how you trade. We test your numbers on every MyFundedPerps plan and account size, and show you which one gives you the best shot.</p>
@@ -188,77 +184,15 @@
   </div>
 </section>
 
-<!-- POSITION SIZER -->
-<section id="view-size" role="tabpanel" aria-labelledby="tab-size" hidden>
-  <div class="hero short">
-    <h1>Size it right</h1>
-    <p class="hero-sub">Pick a market, your risk and your stop. Get a size the market accepts, inside today's loss room.</p>
-  </div>
-  <div class="main">
-    <form class="card form" id="size-form" autocomplete="off" novalidate>
-      <h2>The trade</h2>
-      <div class="field">
-        <label for="market">Market</label>
-        <select id="market" name="market"></select>
-        <span class="hint" id="market-hint"></span>
-      </div>
-      <div class="row2">
-        <div class="field">
-          <label for="s-equity">Equity</label>
-          <div class="box"><span>$</span><input id="s-equity" type="number" inputmode="decimal" min="1" step="100" value="100000"></div>
-        </div>
-        <div class="field">
-          <label for="s-risk">Risk</label>
-          <div class="box"><span>$</span><input id="s-risk" type="number" inputmode="decimal" min="0" step="10" value="500"></div>
-        </div>
-      </div>
-      <div class="field">
-        <label for="s-entry">Entry price</label>
-        <div class="inline">
-          <div class="box"><input id="s-entry" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 97000"></div>
-          <button class="pill" type="button" id="live-price">Live price</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="s-stop">Stop price</label>
-        <div class="inline">
-          <div class="box"><input id="s-stop" type="number" inputmode="decimal" min="0" step="any" placeholder="Below entry = long"></div>
-          <button class="pill" type="button" id="atr-stop" title="Stop 1.5 × the 1-hour ATR below the entry">Suggest stop</button>
-        </div>
-      </div>
-      <details class="more">
-        <summary>Today's loss room</summary>
-        <div class="row2">
-          <div class="field">
-            <label for="s-plan">Plan</label>
-            <select id="s-plan"></select>
-          </div>
-          <div class="field">
-            <label for="s-lost">Lost today</label>
-            <div class="box"><span>$</span><input id="s-lost" type="number" inputmode="decimal" min="0" step="10" value="0"></div>
-          </div>
-        </div>
-        <div class="field">
-          <label for="s-start">Starting balance</label>
-          <div class="box"><span>$</span><input id="s-start" type="number" inputmode="decimal" min="1" step="1000" value="100000"></div>
-        </div>
-      </details>
-      <p class="hint" id="price-status" aria-live="polite"></p>
-    </form>
-    <div class="results">
-      <article class="card answer size-out" aria-live="polite" id="size-out"></article>
-    </div>
-  </div>
-</section>
 
 <a href="#results" class="oddsbar" id="oddsbar" hidden><span id="oddsbar-pct">–</span> <span id="oddsbar-label">to pass</span><span class="go">See result</span></a>
 
 <footer>
   <div class="foot-in">
     <p>Simulated results, not real ones, and not financial advice. An unofficial tool, not made by or affiliated with MyFundedPerps.</p>
-    <p>Rules from the <a id="rules-link" href="#" rel="noopener">MyFundedPerps challenge guide</a> (<span id="rules-date"></span>). Markets from their public API (<span id="markets-date">loading</span>); prices from Binance and Hyperliquid. <a href="https://github.com/AtomiqTraders/pass-odds" rel="noopener">Source</a>.</p>
+    <p>Rules from the <a id="rules-link" href="#" rel="noopener">MyFundedPerps challenge guide</a> (<span id="rules-date"></span>). <a href="https://github.com/AtomiqTraders/pass-odds" rel="noopener">Source</a>.</p>
   </div>
 </footer>
-<script type="module" src="js/app.js?v=6"></script>
+<script type="module" src="js/app.js?v=8"></script>
 </body>
 </html>

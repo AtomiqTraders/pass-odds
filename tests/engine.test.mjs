@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { simulate, room, rankPlans, recommend, SIZES, PLANS, mulberry32, expectancyR } from "../js/sim.js";
-import { sizePosition, floorToStep, atr } from "../js/sizer.js";
 
 const select = PLANS.find((p) => p.id === "select");
 const nodll = PLANS.find((p) => p.id === "elite-nodll");
@@ -112,50 +111,4 @@ test("caps stop a crafted link from freezing the page", () => {
 test("input validation", () => {
   assert.throws(() => simulate({ plan: select, winRate: 1.5 }), /Win rate/);
   assert.throws(() => simulate({}), /plan/);
-});
-
-const btc = { market_id: "binance|BTCUSDT", symbol: "BTC", max_leverage: 2, min_notional: 10, min_size: 0.001, size_step: 0.001, size_decimals: 3, contract_size: 1 };
-
-test("floorToStep has no float drift", () => {
-  assert.equal(floorToStep(0.3, 0.1, 1), 0.3);
-  assert.equal(floorToStep(1.23456, 0.001, 3), 1.234);
-  assert.equal(floorToStep(7.9999, 1, 0), 7);
-});
-
-test("sizer: risk-limited long", () => {
-  // $500 risk, $1,000 stop -> 0.5 BTC, $50k notional on $100k = 0.5x.
-  const s = sizePosition({ equity: 100000, riskUsd: 500, entry: 100000, stop: 99000, market: btc });
-  assert.equal(s.ok, true);
-  assert.equal(s.side, "long");
-  assert.equal(s.qty, 0.5);
-  assert.equal(s.lossAtStop, 500);
-  assert.equal(s.limitedBy, "your risk");
-});
-
-test("sizer: leverage cap binds on a tight stop", () => {
-  // $500 risk with a $50 stop wants 10 BTC = $1M; 2x on $100k caps at 2 BTC.
-  const s = sizePosition({ equity: 100000, riskUsd: 500, entry: 100000, stop: 100050, market: btc });
-  assert.equal(s.side, "short");
-  assert.equal(s.qty, 2);
-  assert.match(s.limitedBy, /leverage/);
-  assert.equal(s.lossAtStop, 100);
-});
-
-test("sizer: daily room caps the risk", () => {
-  const s = sizePosition({ equity: 100000, riskUsd: 500, entry: 100000, stop: 99000, market: btc, dailyRoomUsd: 300 });
-  assert.equal(s.qty, 0.3);
-  assert.equal(s.limitedBy, "daily loss room");
-  assert.equal(s.lossesUntilDaily, 1);
-});
-
-test("sizer: rejects below minimums and bad input", () => {
-  const tiny = sizePosition({ equity: 1000, riskUsd: 0.5, entry: 100000, stop: 99000, market: btc });
-  assert.equal(tiny.ok, false);
-  assert.equal(sizePosition({ equity: 1000, riskUsd: 10, entry: 100, stop: 100, market: btc }).ok, false);
-});
-
-test("ATR", () => {
-  const c = Array.from({ length: 20 }, (_, i) => ({ h: 102 + i, l: 100 + i, c: 101 + i }));
-  assert.equal(atr(c, 14), 2);
-  assert.equal(atr(c.slice(0, 5), 14), null);
 });

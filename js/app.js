@@ -1,7 +1,5 @@
-import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js?v=6";
-import { sizePosition, atr } from "./sizer.js?v=6";
-import { fetchPrice, fetchCandles, priceSupported } from "./market.js?v=6";
-import { drawCard } from "./card.js?v=6";
+import { PLANS, RULES_SOURCE, RULES_AS_OF, SIZES } from "./sim.js?v=8";
+import { drawCard } from "./card.js?v=8";
 
 const $ = (id) => document.getElementById(id);
 const pct = (x, d = 0) => `${(x * 100).toFixed(d)}%`;
@@ -37,17 +35,6 @@ function themeLabel() {
 }
 themeLabel();
 
-/* ---------- tabs ---------- */
-const tabs = [["tab-odds", "view-odds"], ["tab-size", "view-size"]];
-function showTab(id) {
-  for (const [t, v] of tabs) {
-    const on = t === id;
-    $(t).setAttribute("aria-selected", String(on));
-    $(v).hidden = !on;
-  }
-  if (id === "tab-odds" && lastResult) drawPaths(lastResult);
-}
-for (const [t] of tabs) $(t).addEventListener("click", () => showTab(t));
 
 /* ---------- rules footer ---------- */
 $("rules-link").href = RULES_SOURCE;
@@ -55,7 +42,6 @@ $("rules-date").textContent = RULES_AS_OF;
 
 /* ---------- plan + size selects ---------- */
 for (const p of PLANS) {
-  $("s-plan").add(new Option(p.name, p.id));
   $("view-plan").add(new Option(p.name, p.id));
 }
 for (const s of SIZES) $("view-size").add(new Option(sizeName(s), String(s)));
@@ -184,7 +170,7 @@ function animatePass(to) {
 /* ---------- compute in a worker so sliders stay smooth ---------- */
 let worker = null;
 try {
-  worker = new Worker(new URL("./worker.js?v=6", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=8", import.meta.url), { type: "module" });
 } catch { worker = null; }
 let reqId = 0;
 const pending = new Map();
@@ -198,7 +184,7 @@ if (worker) {
 }
 function compute(input) {
   if (!worker) {
-    return import("./engine.js?v=6").then(({ analyze }) => {
+    return import("./engine.js?v=8").then(({ analyze }) => {
       try { return { out: analyze(input) }; } catch (err) { return { error: err.message }; }
     });
   }
@@ -597,135 +583,6 @@ document.querySelectorAll(".sheet").forEach((el, i) => {
 /* mobile odds pill: visible while the results panel is off screen */
 let resultsVisible = true;
 function updateOddsbar() {
-  $("oddsbar").hidden = resultsVisible || $("view-odds").hidden;
+  $("oddsbar").hidden = resultsVisible;
 }
 new IntersectionObserver(([e]) => { resultsVisible = e.isIntersecting; updateOddsbar(); }).observe($("results"));
-for (const [t] of tabs) $(t).addEventListener("click", updateOddsbar);
-
-/* ================= POSITION SIZER ================= */
-let markets = [];
-const marketById = (id) => markets.find((m) => m.market_id === id);
-const PROVIDER_NAMES = { binance: "Crypto (Binance)", hyperliquid: "Stocks & more (Hyperliquid)", veranta: "Forex & more (Veranta)", ostium: "Ostium" };
-
-async function loadMarkets() {
-  try {
-    const res = await fetch("data/markets.json", { cache: "no-cache" });
-    const doc = await res.json();
-    markets = doc.markets;
-    $("markets-date").textContent = `updated ${doc.fetched_at.slice(0, 10)}`;
-  } catch {
-    $("market-hint").textContent = "Couldn't load the market list.";
-    return;
-  }
-  const sel = $("market");
-  const groups = {};
-  for (const m of markets) (groups[m.provider] ||= []).push(m);
-  for (const [prov, list] of Object.entries(groups)) {
-    const og = document.createElement("optgroup");
-    og.label = PROVIDER_NAMES[prov] || prov;
-    for (const m of list) og.append(new Option(`${m.symbol} · ${m.max_leverage}x max`, m.market_id));
-    sel.append(og);
-  }
-  const btc = markets.find((m) => m.market_id === "binance|BTCUSDT");
-  if (btc) sel.value = btc.market_id;
-  onMarket();
-}
-
-function onMarket() {
-  const m = marketById($("market").value);
-  if (!m) return;
-  $("market-hint").textContent = `Max leverage ${m.max_leverage}x · min order $${m.min_notional} · size step ${m.size_step}`;
-  const live = priceSupported(m);
-  $("live-price").disabled = !live;
-  $("atr-stop").disabled = !live;
-  $("price-status").textContent = live ? "" : "No free price feed for this venue. Type the prices in.";
-  $("s-entry").value = "";
-  $("s-stop").value = "";
-  if (live) getLivePrice();
-  else renderSize();
-}
-
-async function getLivePrice() {
-  const m = marketById($("market").value);
-  if (!m) return;
-  $("live-price").disabled = true;
-  $("price-status").textContent = "Getting price…";
-  try {
-    const { price, source } = await fetchPrice(m);
-    $("s-entry").value = price;
-    $("price-status").textContent = `${source} price at ${new Date().toLocaleTimeString()}. It can differ slightly from the firm's mark.`;
-  } catch (e) {
-    $("price-status").textContent = `Couldn't get a price: ${e.message}`;
-  } finally {
-    $("live-price").disabled = !priceSupported(m);
-    renderSize();
-  }
-}
-
-async function atrStop() {
-  const m = marketById($("market").value);
-  const entry = Number($("s-entry").value);
-  if (!m || !(entry > 0)) { $("price-status").textContent = "Enter an entry price first."; return; }
-  $("atr-stop").disabled = true;
-  $("price-status").textContent = "Reading 1-hour candles…";
-  try {
-    const a = atr(await fetchCandles(m), 14);
-    if (!a) throw new Error("not enough candles");
-    const short = Number($("s-stop").value) > entry;
-    const stop = short ? entry + 1.5 * a : entry - 1.5 * a;
-    $("s-stop").value = Number(stop.toPrecision(8));
-    $("price-status").textContent = `1-hour ATR is ${num(a, 6)}. Stop set 1.5 ATR ${short ? "above" : "below"} the entry.`;
-  } catch (e) {
-    $("price-status").textContent = `Couldn't read candles: ${e.message}`;
-  } finally {
-    $("atr-stop").disabled = !priceSupported(m);
-    renderSize();
-  }
-}
-
-function renderSize() {
-  const m = marketById($("market").value);
-  const v = (id) => Number($(id).value);
-  const plan = planById($("s-plan").value);
-  const start = v("s-start"), equity = v("s-equity");
-  const dailyRoom = plan.dll == null ? Infinity : Math.max(0, plan.dll * start - v("s-lost"));
-  const ddRoom = Math.max(0, equity - start * (1 - plan.maxDD));
-  const out = $("size-out");
-
-  if (!(v("s-entry") > 0) || !(v("s-stop") > 0)) {
-    out.innerHTML = `<p class="muted">Enter an entry and a stop to size the trade.</p>${roomHtml(plan, dailyRoom, ddRoom)}`;
-    return;
-  }
-  const s = sizePosition({ equity, riskUsd: v("s-risk"), entry: v("s-entry"), stop: v("s-stop"), market: m, dailyRoomUsd: dailyRoom, ddRoomUsd: ddRoom });
-  if (!s.ok) {
-    out.innerHTML = `<div class="err">${s.errors.map(esc).join("<br>")}</div>${roomHtml(plan, dailyRoom, ddRoom)}`;
-    return;
-  }
-  const dec = Number.isInteger(m.size_decimals) ? Math.min(12, Math.max(0, m.size_decimals)) : 4;
-  const sym = esc(m.symbol);
-  const item = (k, val, sub) => `<div><dt>${esc(k)}</dt><dd>${esc(val)}</dd><div class="s">${esc(sub)}</div></div>`;
-  out.innerHTML = `
-    <div class="side">${s.side === "long" ? "Long" : "Short"} ${sym}</div>
-    <div class="bigline">${esc(s.qty.toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec }))}<span class="unit">${sym}</span></div>
-    <dl class="stats">
-      ${item("Loss at stop", money(s.lossAtStop, 2), `limited by ${s.limitedBy}`)}
-      ${item("Position value", money(s.notional), `${num(s.leverage)}x of ${s.maxLeverage}x max`)}
-      ${item("Stop distance", pct(s.stopPct, 2), `${num(s.stopDist, 6)} per ${m.symbol}`)}
-      ${item("Losses like this to the daily limit", s.lossesUntilDaily ?? "no limit", plan.name)}
-    </dl>
-    ${s.warnings.map((w) => `<div class="warn">${esc(w)}</div>`).join("")}
-    ${roomHtml(plan, dailyRoom, ddRoom)}
-    <p class="small muted">Type the size into the order ticket yourself. This tool never places orders.</p>`;
-}
-
-function roomHtml(plan, dailyRoom, ddRoom) {
-  return `<h3>Room left today</h3><p class="small">Daily loss limit: <b>${esc(Number.isFinite(dailyRoom) ? money(dailyRoom) : "none on this plan")}</b> · Above the drawdown floor: <b>${esc(money(ddRoom))}</b> · ${esc(plan.name)}</p>`;
-}
-
-$("market").addEventListener("change", onMarket);
-$("live-price").addEventListener("click", getLivePrice);
-$("atr-stop").addEventListener("click", atrStop);
-$("size-form").addEventListener("input", (e) => { if (e.target.id !== "market") renderSize(); });
-$("size-form").addEventListener("submit", (e) => e.preventDefault());
-$("s-plan").addEventListener("change", renderSize);
-loadMarkets();

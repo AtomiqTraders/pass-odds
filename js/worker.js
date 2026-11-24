@@ -1,4 +1,4 @@
-import { analyze } from "./engine.js?v=6";
+import { analyze } from "./engine.js?v=8";
 
 self.onmessage = (e) => {
   const { id, input } = e.data;
